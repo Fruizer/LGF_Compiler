@@ -2,6 +2,14 @@ import tkinter as tk
 from tkinter import scrolledtext
 import sys
 
+# --- GAME STATE VARIABLES ---
+lgf_coins = 0
+current_quest_index = 0
+quests = [
+    {"title": "Quest 1: The Basics", "task": "Declare an OUNT (Integer) variable.", "target_token": "OUNT", "reward": 50},
+    {"title": "Quest 2: Speak Up", "task": "Use the RELEASE command to print something.", "target_token": "OUTPUT_CMD", "reward": 100}
+]
+
 symbol_table = {}
 
 def lgf_compiler(source_code):
@@ -196,6 +204,27 @@ left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
 
 right_frame = tk.Frame(root, bg=bg_color)
 right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+# --- NEW GAMIFICATION UI ---
+
+# 1. The Coin Tracker & Gacha Button
+stat_frame = tk.Frame(left_frame, bg=bg_color)
+stat_frame.pack(fill=tk.X, pady=(0, 10))
+
+lbl_coins = tk.Label(stat_frame, text=f"🪙 LGF Coins: {lgf_coins}", bg=bg_color, fg="#ffd700", font=("Consolas", 14, "bold"))
+lbl_coins.pack(side=tk.LEFT)
+
+btn_gacha = tk.Button(stat_frame, text="🎁 Gacha Pull", bg="#8a2be2", fg="white", font=("Consolas", 10, "bold"), relief="flat")
+btn_gacha.pack(side=tk.RIGHT)
+
+# 2. The Quest Board
+lbl_quest_title = tk.Label(left_frame, text="📜 ACTIVE QUEST", bg=bg_color, fg="#4af626", font=("Consolas", 14, "bold"))
+lbl_quest_title.pack(anchor="w", pady=(10, 0))
+
+lbl_quest_desc = tk.Label(left_frame, text=quests[current_quest_index]["task"], bg=bg_color, fg="white", font=("Consolas", 10), wraplength=280, justify="left")
+lbl_quest_desc.pack(anchor="w", pady=(0, 20))
+
+# --- END GAMIFICATION UI ---
 
 lbl_cheat = tk.Label(left_frame, text="LGF CHEAT SHEET", bg=bg_color, fg=accent_color, font=("Consolas", 14, "bold"))
 lbl_cheat.pack(anchor="w", pady=(0, 10))
