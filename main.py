@@ -1,18 +1,17 @@
 import tkinter as tk
 from tkinter import scrolledtext
 import sys
+import random
 
-# --- GAME STATE VARIABLES ---
+# --- GAME STATE ---
 lgf_coins = 0
-current_quest_index = 0
-quests = [
-    {"title": "Quest 1: The Basics", "task": "Declare an OUNT (Integer) variable.", "target_token": "OUNT", "reward": 50},
-    {"title": "Quest 2: Speak Up", "task": "Use the RELEASE command to print something.", "target_token": "OUTPUT_CMD", "reward": 100}
-]
-
 symbol_table = {}
+inventory = []
+equipped_theme = "Default Theme"
 
+# --- CORE COMPILER LOGIC ---
 def lgf_compiler(source_code):
+    """Your actual lexical, syntax, and semantic engine."""
     print(f"\nInput Code: {source_code}\n")
 
     cleaned_code = source_code.replace(":>", " :> ").replace(",", " , ")
@@ -24,113 +23,70 @@ def lgf_compiler(source_code):
     # LEXER ANALYSIS
     print("--- STARTING LEXICAL ANALYSIS ---")
     tokens = []
-
     for word in words:
         if word in ["OUNT", "HERO", "TAMARAW", "YEARN"]:
             tokens.append(("DATATYPE", word))
-            print(f"[LEXER] Found '{word}' -> Identified as DATATYPE")
         elif word == "IS":
             tokens.append(("ASSIGN", word))
-            print(f"[LEXER] Found '{word}' -> Identified as ASSIGN OPERATOR")
         elif word == ":>":
             tokens.append(("DELIMITER", word))
-            print(f"[LEXER] Found '{word}' -> Identified as DELIMITER")
         elif word == "RELEASE":
             tokens.append(("OUTPUT_CMD", word))
-            print(f"[LEXER] Found '{word}' -> Identified as OUTPUT_CMD")
         elif word == "EndThat":
             tokens.append(("NEWLINE", word))
-            print(f"[LEXER] Found '{word}' -> Identified as NEWLINE_MANIPULATOR")
         elif word == ",":
             tokens.append(("COMMA", word))
-            print(f"[LEXER] Found '{word}' -> Identified as COMMA")
         elif word.isdigit():
             tokens.append(("LITERAL_INT", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_INT")
         elif word.startswith('"') and word.endswith('"'):
             tokens.append(("LITERAL_STRING", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_STRING")
         elif word.startswith("'") and word.endswith("'") and len(word) == 3:
             tokens.append(("LITERAL_CHAR", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_CHAR")
         elif word in ["True", "False"]:
             tokens.append(("LITERAL_BOOL", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_BOOL")
         else:
             tokens.append(("IDENTIFIER", word))
-            print(f"[LEXER] Found '{word}' -> Identified as IDENTIFIER")
-            
     print("Lexical Analysis Complete.\n")
 
-    # PARSER THINGS
+    # PARSER
     print("--- STARTING SYNTAX ANALYSIS ---")
-    print("[PARSER] Checking statement structure...")
-
     is_assignment = False
     is_release = False
 
     if tokens[0][0] == "DATATYPE":
         is_assignment = True
-        print("[PARSER] Expected rule: [DATATYPE] [IDENTIFIER] [ASSIGN] [LITERAL] [DELIMITER]")
-        if len(tokens) == 5:
-            if (tokens[1][0] == "IDENTIFIER" and
-                tokens[2][0] == "ASSIGN" and
-                tokens[3][0].startswith("LITERAL") and
-                tokens[4][0] == "DELIMITER"):
-                print("[PARSER] Actual structure matches expected rule perfectly.")
-                print("Syntax Analysis Complete. No structural errors.\n")
-            else:
-                print("[PARSER] FATAL ERROR: Syntax is invalid. Wrong token order.")
-                return
+        if len(tokens) == 5 and (tokens[1][0] == "IDENTIFIER" and tokens[2][0] == "ASSIGN" and tokens[3][0].startswith("LITERAL") and tokens[4][0] == "DELIMITER"):
+            print("Syntax Analysis Complete. No structural errors.\n")
         else:
-            print("[PARSER] FATAL ERROR: Syntax is invalid. Missing or extra tokens.")
+            print("[PARSER] FATAL ERROR: Syntax is invalid. Fix your grammar.")
             return
-
     elif tokens[0][0] == "OUTPUT_CMD":
         is_release = True
-        print("[PARSER] Expected rule: RELEASE [Identifier/Literal], EndThat :> (or similar list)")
         if tokens[-1][0] != "DELIMITER":
             print("[PARSER] FATAL ERROR: Missing delimiter ':>' at the end.")
             return
-        print("[PARSER] Structure accepted for RELEASE command.")
         print("Syntax Analysis Complete. No structural errors.\n")
-
     else:
         print("[PARSER] FATAL ERROR: Unknown statement structure.")
         return
 
-    # SEMANTIC ANALYSIS
+    # SEMANTICS
     print("--- STARTING SEMANTIC ANALYSIS ---")
-    
     if is_assignment:
-        print("[SEMANTICS] Checking Type Compatibility...")
-        var_type = tokens[0][1]
-        var_name = tokens[1][1]
-        var_value = tokens[3][1]
-        literal_type = tokens[3][0]
-
-        print(f"[SEMANTICS] Variable '{var_name}' is declared as '{var_type}'. Value is '{var_value}'.")
-
-        is_valid_type = False
-        if var_type == "OUNT" and literal_type == "LITERAL_INT":
-            is_valid_type = True
-        elif var_type == "YEARN" and literal_type == "LITERAL_STRING":
-            is_valid_type = True
-        elif var_type == "HERO" and literal_type == "LITERAL_CHAR":
-            is_valid_type = True
-        elif var_type == "TAMARAW" and literal_type == "LITERAL_BOOL":
-            is_valid_type = True
+        var_type, var_name, var_value, literal_type = tokens[0][1], tokens[1][1], tokens[3][1], tokens[3][0]
+        
+        is_valid_type = (var_type == "OUNT" and literal_type == "LITERAL_INT") or \
+                        (var_type == "YEARN" and literal_type == "LITERAL_STRING") or \
+                        (var_type == "HERO" and literal_type == "LITERAL_CHAR") or \
+                        (var_type == "TAMARAW" and literal_type == "LITERAL_BOOL")
 
         if is_valid_type:
-            print("[SEMANTICS] Types match. No coercion needed.")
             symbol_table[var_name] = {"type": var_type, "value": var_value}
             print(f"[SEMANTICS] Binding variable '{var_name}' to Symbol Table.")
         else:
-            print(f"[SEMANTICS] FATAL ERROR: Variable '{var_name}' is declared as '{var_type}', but value is a different type.")
-            print("[SEMANTICS] Recovery Strategy: Compiler will discard assignment.")
+            print(f"[SEMANTICS] FATAL ERROR: Type mismatch. Cannot put {literal_type} into {var_type}.")
             
     elif is_release:
-        print("[SEMANTICS] Executing Output Command...")
         output_string = ""
         for i in range(1, len(tokens) - 1):
             tok_type, tok_val = tokens[i]
@@ -144,20 +100,14 @@ def lgf_compiler(source_code):
                 output_string += str(tok_val).replace('"', '').replace("'", "")
             elif tok_type == "NEWLINE":
                 output_string += "\n"
-            elif tok_type == "COMMA":
-                pass
                 
         print("\n=== PROGRAM OUTPUT ===")
         print(output_string)
         print("======================\n")
 
-    print("Semantic Analysis Complete.\n")
-    print("-" * 50)
-
-# GUI AREAS
-
+# --- UI REDIRECTION & EXECUTION ---
 class RedirectText(object):
-    """Utility class to redirect print() statements to the GUI text box."""
+    """Redirects print() statements to the Tkinter text box."""
     def __init__(self, text_ctrl):
         self.output = text_ctrl
     def write(self, string):
@@ -166,120 +116,168 @@ class RedirectText(object):
     def flush(self):
         pass
 
-def clear_console():
-    console_output.delete("1.0", tk.END)
-    global symbol_table
-    symbol_table.clear()
-
 def execute_code():
-    global symbol_table
+    """Runs the real compiler and awards coins based on success."""
+    global symbol_table, lgf_coins
     symbol_table.clear()
+    console_output.delete("1.0", tk.END)
     
     code = code_input.get("1.0", tk.END).strip()
-    
-    if code.lower() == "clear":
-        clear_console()
-        code_input.delete("1.0", tk.END)
+    if not code:
+        console_output.insert(tk.END, "Bro, the editor is empty. Type something.\n")
         return
 
-    if code:
-        lines = [line.strip() for line in code.split('\n') if line.strip()]
-        for line in lines:
-            lgf_compiler(line)
+    # Run the actual compiler line by line
+    lines = [line.strip() for line in code.split('\n') if line.strip()]
+    for line in lines:
+        lgf_compiler(line)
+    
+    # Check if the compiler threw any errors
+    output_text = console_output.get("1.0", tk.END)
+    if "FATAL ERROR" in output_text:
+        console_output.insert(tk.END, "\n💀 [SYSTEM] Compilation failed. 0 Coins awarded. Fix your code.\n")
+    else:
+        reward = len(lines) * 20 # 20 coins per successful line
+        lgf_coins += reward
+        console_output.insert(tk.END, f"\n✨ [SYSTEM] Flawless Execution! +{reward} LGF Coins added to vault.\n")
+        update_coin_labels()
+
+def pull_gacha():
+    """Spends coins and adds the item directly to the Inventory Listbox."""
+    global lgf_coins, inventory
+    
+    loot_pool = ["Cyberpunk Neon Syntax", "Hacker Terminal Font", "Abyssal Void Dark Mode", "OLED Pure Black"]
+    
+    if lgf_coins >= 100:
+        lgf_coins -= 100
+        won_item = random.choice(loot_pool)
+        
+        # Prevent duplicates
+        if won_item not in inventory: 
+            inventory.append(won_item)
+            inventory_listbox.insert(tk.END, won_item)
             
+        gacha_result.config(text=f"🎉 YOU UNLOCKED: [{won_item}]! 🎉", fg="#4af626")
+    else:
+        gacha_result.config(text="❌ Bro, you are broke. Go write some flawless code.", fg="#ff4c4c")
+    
+    update_coin_labels()
 
-# MAIN
+def equip_item():
+    """Takes the selected item from the listbox and 'equips' it."""
+    global equipped_theme
+    
+    # Get the index of the clicked item
+    selection = inventory_listbox.curselection()
+    
+    if selection:
+        item = inventory_listbox.get(selection[0])
+        equipped_theme = item
+        lbl_equipped.config(text=f"Equipped: [{equipped_theme}]")
+        gacha_result.config(text=f"✨ Equipped {equipped_theme} successfully!", fg="#007acc")
+    else:
+        gacha_result.config(text="⚠️ Select an item from your vault first.", fg="#ff4c4c")
+
+# --- THE ROUTER ---
+def show_frame(frame_to_show):
+    menu_frame.pack_forget()
+    coding_frame.pack_forget()
+    gacha_frame.pack_forget()
+    cheat_frame.pack_forget()
+    frame_to_show.pack(fill=tk.BOTH, expand=True)
+
+def update_coin_labels():
+    lbl_menu_coins.config(text=f"🪙 Vault: {lgf_coins}")
+    lbl_gacha_coins.config(text=f"🪙 Vault: {lgf_coins}")
+
+# --- GUI SETUP ---
 root = tk.Tk()
-root.title("LGF Compiler IDE")
-root.geometry("900x600")
-root.configure(bg="#1e1e1e")
+root.geometry("850x650")
+root.title("LGF Client")
+root.configure(bg="#13111C") # Sleeker dark mode
 
-bg_color = "#1e1e1e"
-fg_color = "#d4d4d4"
-accent_color = "#007acc"
-font_main = ("Consolas", 11)
+menu_frame = tk.Frame(root, bg="#13111C")
+coding_frame = tk.Frame(root, bg="#13111C")
+gacha_frame = tk.Frame(root, bg="#13111C")
+cheat_frame = tk.Frame(root, bg="#13111C")
 
-left_frame = tk.Frame(root, bg=bg_color, width=300)
-left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
+# ==========================================
+# SCREEN 1: MAIN MENU
+# ==========================================
+tk.Label(menu_frame, text="LGF COMPILER", font=("Consolas", 36, "bold"), bg="#13111C", fg="white").pack(pady=(120, 10))
+tk.Label(menu_frame, text="Developer Edition", font=("Consolas", 14, "italic"), bg="#13111C", fg="#8a2be2").pack(pady=(0, 30))
 
-right_frame = tk.Frame(root, bg=bg_color)
-right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+lbl_menu_coins = tk.Label(menu_frame, text=f"🪙 Vault: {lgf_coins}", font=("Consolas", 16, "bold"), bg="#13111C", fg="#ffd700")
+lbl_menu_coins.pack(pady=10)
 
-# --- NEW GAMIFICATION UI ---
+tk.Button(menu_frame, text="PLAY", font=("Consolas", 14, "bold"), bg="#007acc", fg="white", width=25, command=lambda: show_frame(coding_frame)).pack(pady=10)
+tk.Button(menu_frame, text="PULL", font=("Consolas", 14, "bold"), bg="#8a2be2", fg="white", width=25, command=lambda: show_frame(gacha_frame)).pack(pady=10)
+tk.Button(menu_frame, text="CODEX", font=("Consolas", 14, "bold"), bg="#2d2d2d", fg="white", width=25, command=lambda: show_frame(cheat_frame)).pack(pady=10)
 
-# 1. The Coin Tracker & Gacha Button
-stat_frame = tk.Frame(left_frame, bg=bg_color)
-stat_frame.pack(fill=tk.X, pady=(0, 10))
+# ==========================================
+# SCREEN 2: CODING ARENA
+# ==========================================
+tk.Button(coding_frame, text="⬅ MAIN MENU", font=("Consolas", 10), bg="#2d2d2d", fg="white", command=lambda: show_frame(menu_frame)).pack(anchor="nw", padx=10, pady=10)
 
-lbl_coins = tk.Label(stat_frame, text=f"🪙 LGF Coins: {lgf_coins}", bg=bg_color, fg="#ffd700", font=("Consolas", 14, "bold"))
-lbl_coins.pack(side=tk.LEFT)
+tk.Label(coding_frame, text="MISSION: Declare an OUNT variable perfectly.", font=("Consolas", 12, "bold"), bg="#13111C", fg="#4af626").pack(pady=5)
 
-btn_gacha = tk.Button(stat_frame, text="🎁 Gacha Pull", bg="#8a2be2", fg="white", font=("Consolas", 10, "bold"), relief="flat")
-btn_gacha.pack(side=tk.RIGHT)
+code_input = tk.Text(coding_frame, height=8, bg="#1e1e1e", fg="#ce9178", font=("Consolas", 12), insertbackground="white")
+code_input.pack(fill=tk.X, padx=20)
 
-# 2. The Quest Board
-lbl_quest_title = tk.Label(left_frame, text="📜 ACTIVE QUEST", bg=bg_color, fg="#4af626", font=("Consolas", 14, "bold"))
-lbl_quest_title.pack(anchor="w", pady=(10, 0))
+tk.Button(coding_frame, text="COMPILE & EXECUTE", font=("Consolas", 12, "bold"), bg="#007acc", fg="white", command=execute_code).pack(pady=10)
 
-lbl_quest_desc = tk.Label(left_frame, text=quests[current_quest_index]["task"], bg=bg_color, fg="white", font=("Consolas", 10), wraplength=280, justify="left")
-lbl_quest_desc.pack(anchor="w", pady=(0, 20))
+console_output = scrolledtext.ScrolledText(coding_frame, height=12, bg="#000000", fg="#4af626", font=("Consolas", 10))
+console_output.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+sys.stdout = RedirectText(console_output) # Route prints to terminal
 
-# --- END GAMIFICATION UI ---
+# ==========================================
+# SCREEN 3: GACHA PULL (THE MARKETPLACE)
+# ==========================================
+pull_left = tk.Frame(gacha_frame, bg="#13111C")
+pull_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-lbl_cheat = tk.Label(left_frame, text="LGF CHEAT SHEET", bg=bg_color, fg=accent_color, font=("Consolas", 14, "bold"))
-lbl_cheat.pack(anchor="w", pady=(0, 10))
+inv_right = tk.Frame(gacha_frame, bg="#1E1E1E", width=300)
+inv_right.pack(side=tk.RIGHT, fill=tk.Y)
 
-cheat_text = """DATA TYPES:
-• OUNT: Integer
-• HERO: Char ('A')
-• TAMARAW: Bool (True/False)
-• YEARN: String ("Text")
+# --- LEFT SIDE (The Store) ---
+tk.Button(pull_left, text="⬅ MAIN MENU", font=("Consolas", 10), bg="#2d2d2d", fg="white", command=lambda: show_frame(menu_frame)).pack(anchor="nw", padx=10, pady=10)
 
-OPERATORS:
-• IS: Assignment (=)
-• :>: Delimiter (;)
+tk.Label(pull_left, text="THE MARKETPLACE", font=("Consolas", 28, "bold"), bg="#13111C", fg="#8a2be2").pack(pady=20)
 
-I/O COMMANDS:
-• RELEASE: Print data
-• EndThat: Line break
+lbl_gacha_coins = tk.Label(pull_left, text=f"🪙 Vault: {lgf_coins}", font=("Consolas", 16, "bold"), bg="#13111C", fg="#ffd700")
+lbl_gacha_coins.pack(pady=10)
 
-GRAMMAR RULES:
-1. Declaration:
-[Type] [Name] IS [Value] :>
-Ex: OUNT age IS 20 :>
+tk.Button(pull_left, text="PULL SKIN (100 COINS)", font=("Consolas", 16, "bold"), bg="#8a2be2", fg="white", command=pull_gacha).pack(pady=20)
 
-2. Output:
-RELEASE [Name/Value], EndThat :>
-Ex: RELEASE age, EndThat :>"""
+gacha_result = tk.Label(pull_left, text="Awaiting transaction...", font=("Consolas", 14), bg="#13111C", fg="white")
+gacha_result.pack(pady=20)
 
-cheat_box = tk.Text(left_frame, height=25, width=30, bg="#252526", fg="#9cdcfe", font=("Consolas", 10), bd=0, padx=10, pady=10)
-cheat_box.insert(tk.END, cheat_text)
-cheat_box.config(state=tk.DISABLED)
-cheat_box.pack()
+# --- RIGHT SIDE (The Vault) ---
+tk.Label(inv_right, text="YOUR VAULT", font=("Consolas", 18, "bold"), bg="#1E1E1E", fg="white").pack(pady=(20, 5))
 
-lbl_input = tk.Label(right_frame, text="CODE EDITOR", bg=bg_color, fg=accent_color, font=("Consolas", 12, "bold"))
-lbl_input.pack(anchor="w")
+lbl_equipped = tk.Label(inv_right, text=f"Equipped: [{equipped_theme}]", font=("Consolas", 10, "italic"), bg="#1E1E1E", fg="#4af626", wraplength=250)
+lbl_equipped.pack(pady=(0, 15))
 
-code_input = tk.Text(right_frame, height=5, bg="#1e1e1e", fg="#ce9178", font=font_main, insertbackground="white", bd=1, relief="solid")
-code_input.pack(fill=tk.X, pady=(0, 10))
+# Clickable listbox
+inventory_listbox = tk.Listbox(inv_right, bg="#13111C", fg="white", font=("Consolas", 12), selectbackground="#8a2be2", selectforeground="white", bd=0, highlightthickness=1, highlightcolor="#8a2be2")
+inventory_listbox.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 15))
 
-btn_frame = tk.Frame(right_frame, bg=bg_color)
-btn_frame.pack(fill=tk.X, pady=(0, 10))
+tk.Button(inv_right, text="EQUIP SELECTED", font=("Consolas", 12, "bold"), bg="#007acc", fg="white", command=equip_item).pack(fill=tk.X, padx=20, pady=(0, 20))
 
-btn_run = tk.Button(btn_frame, text="▶ RUN CODE", bg=accent_color, fg="white", font=("Consolas", 10, "bold"), command=execute_code, relief="flat", padx=10)
-btn_run.pack(side=tk.LEFT, padx=(0, 10))
+# ==========================================
+# SCREEN 4: CHEAT SHEET
+# ==========================================
+tk.Button(cheat_frame, text="⬅ MAIN MENU", font=("Consolas", 10), bg="#2d2d2d", fg="white", command=lambda: show_frame(menu_frame)).pack(anchor="nw", padx=10, pady=10)
 
-btn_clear = tk.Button(btn_frame, text="CLEAR CONSOLE", bg="#555555", fg="white", font=("Consolas", 10, "bold"), command=clear_console, relief="flat", padx=10)
-btn_clear.pack(side=tk.LEFT)
+tk.Label(cheat_frame, text="LGF CODEX", font=("Consolas", 28, "bold"), bg="#13111C", fg="#007acc").pack(pady=20)
 
-lbl_output = tk.Label(right_frame, text="COMPILER CONSOLE", bg=bg_color, fg=accent_color, font=("Consolas", 12, "bold"))
-lbl_output.pack(anchor="w")
+codex_text = """OUNT    : Integer (e.g. OUNT age IS 21 :>)
+YEARN   : String (e.g. YEARN name IS "Renzo" :>)
+RELEASE : Print Command (e.g. RELEASE name, EndThat :>)
+:>      : Delimiter (Ends all assignments)"""
 
-console_output = scrolledtext.ScrolledText(right_frame, height=15, bg="#000000", fg="#4af626", font=font_main, bd=0, padx=10, pady=10)
-console_output.pack(fill=tk.BOTH, expand=True)
+tk.Label(cheat_frame, text=codex_text, font=("Consolas", 14), bg="#13111C", fg="white", justify="left").pack(pady=20)
 
-sys.stdout = RedirectText(console_output)
-
-print("LGF Compiler Initialized. Waiting for code...\n")
-
+# --- START ---
+show_frame(menu_frame)
 root.mainloop()
