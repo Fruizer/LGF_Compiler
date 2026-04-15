@@ -11,6 +11,7 @@ equipped_theme = "Default Theme"
 
 quests_completed = 0
 current_difficulty = "EASY"
+is_pulling = False # Prevents spam-clicking the gacha button
 
 # --- THE POLISHED THEME ENGINE DICTIONARY ---
 themes = {
@@ -25,7 +26,8 @@ themes = {
     "Synthwave Sunset": {"bg": "#2b0f4c", "panel": "#3d1466", "accent": "#ff9e00", "text": "#f706d2", "success": "#ff007f", "btn_fg": "black"},
     "Matrix Glitch": {"bg": "#001100", "panel": "#002200", "accent": "#33ff33", "text": "#ccffcc", "success": "#66ff66", "btn_fg": "black"},
     "THE GOLDEN COMPILER": {"bg": "#0B0800", "panel": "#1C1400", "accent": "#FFD700", "text": "#FFF2B2", "success": "#FFB300", "btn_fg": "black"},
-    "FEU TAMARAWS": {"bg": "#014421", "panel": "#012b15", "accent": "#F2A900", "text": "#ffffff", "success": "#FFD700", "btn_fg": "black"}
+    "FEU TAMARAWS": {"bg": "#014421", "panel": "#012b15", "accent": "#F2A900", "text": "#ffffff", "success": "#FFD700", "btn_fg": "black"},
+    "FEU TECH ACM": {"bg": "#0a050f", "panel": "#140a1f", "accent": "#9d4edd", "text": "#e0caff", "success": "#c77dff", "btn_fg": "white"}
 }
 
 quest_db = {
@@ -33,26 +35,41 @@ quest_db = {
         {"task": "MISSION: Declare an OUNT (Integer).", "target": "OUNT", "reward": 50},
         {"task": "MISSION: Declare a YEARN (String).", "target": "YEARN", "reward": 50},
         {"task": "MISSION: Declare a TAMARAW (Bool).", "target": "TAMARAW", "reward": 50},
-        {"task": "MISSION: Declare a HERO (Char).", "target": "HERO", "reward": 50}
+        {"task": "MISSION: Declare a HERO (Char).", "target": "HERO", "reward": 50},
+        {"task": "MISSION: Declare an OUNT equal to 0.", "target": "OUNT_ZERO", "reward": 50}
     ],
     "MEDIUM": [
         {"task": "MISSION: Print data using RELEASE.", "target": "RELEASE", "reward": 100},
         {"task": "MISSION: Declare TWO different OUNT variables.", "target": "TWO_OUNT", "reward": 100},
-        {"task": "MISSION: Declare TWO different YEARN variables.", "target": "TWO_YEARN", "reward": 100}
+        {"task": "MISSION: Declare TWO different YEARN variables.", "target": "TWO_YEARN", "reward": 100},
+        {"task": "MISSION: Add two numbers (e.g., OUNT x IS 5 + 5 :>).", "target": "MATH_ADD", "reward": 150},
+        {"task": "MISSION: Subtract two numbers.", "target": "MATH_SUB", "reward": 150}
     ],
     "HARD": [
         {"task": "MISSION: Declare an OUNT, then RELEASE it.", "target": "COMBO_OUNT_RELEASE", "reward": 250},
         {"task": "MISSION: Declare a YEARN, then RELEASE it.", "target": "COMBO_YEARN_RELEASE", "reward": 250},
-        {"task": "MISSION: Declare a TAMARAW and an OUNT.", "target": "COMBO_TAMARAW_OUNT", "reward": 250}
+        {"task": "MISSION: Declare a TAMARAW and an OUNT.", "target": "COMBO_TAMARAW_OUNT", "reward": 250},
+        {"task": "MISSION: Multiply two numbers and RELEASE the result.", "target": "MATH_COMBO_MUL", "reward": 300}
     ]
 }
 
 def generate_quest():
+    """Dynamic pacing system based on quests completed."""
     global current_difficulty
-    if quests_completed >= 6:
-        current_difficulty = "HARD"
-    elif quests_completed >= 3:
-        current_difficulty = "MEDIUM"
+    
+    if quests_completed < 3:
+        # Phase 1: Tutorial
+        current_difficulty = "EASY"
+    elif quests_completed < 8:
+        # Phase 2: Ramp Up
+        tiers = ["EASY", "MEDIUM"]
+        weights = [30, 70] 
+        current_difficulty = random.choices(tiers, weights=weights, k=1)[0]
+    else:
+        # Phase 3: The Gauntlet
+        tiers = ["EASY", "MEDIUM", "HARD"]
+        weights = [15, 35, 50] 
+        current_difficulty = random.choices(tiers, weights=weights, k=1)[0]
         
     pool = quest_db[current_difficulty]
     return random.choice(pool)
@@ -62,8 +79,11 @@ active_quest = generate_quest()
 # --- CORE COMPILER LOGIC ---
 def lgf_compiler(source_code):
     print(f"\nInput Code: {source_code}\n")
+    
     cleaned_code = source_code.replace(":>", " :> ").replace(",", " , ")
+    cleaned_code = cleaned_code.replace("+", " + ").replace("-", " - ").replace("*", " * ").replace("/", " / ")
     words = cleaned_code.split()
+    
     if not words:
         return
 
@@ -88,6 +108,9 @@ def lgf_compiler(source_code):
         elif word == ",":
             tokens.append(("COMMA", word))
             print(f"[LEXER] Found '{word}' -> Identified as COMMA")
+        elif word in ["+", "-", "*", "/"]:
+            tokens.append(("MATH_OP", word))
+            print(f"[LEXER] Found '{word}' -> Identified as MATH_OP")
         elif word.isdigit():
             tokens.append(("LITERAL_INT", word))
             print(f"[LEXER] Found '{word}' -> Identified as LITERAL_INT")
@@ -108,34 +131,34 @@ def lgf_compiler(source_code):
     print("--- STARTING SYNTAX ANALYSIS ---")
     print("[PARSER] Checking statement structure...")
     is_assignment = False
+    is_math_assignment = False
     is_release = False
 
     if tokens[0][0] == "DATATYPE":
-        is_assignment = True
-        print("[PARSER] Expected rule: [DATATYPE] [IDENTIFIER] [ASSIGN] [LITERAL] [DELIMITER]")
         if len(tokens) == 5 and (tokens[1][0] == "IDENTIFIER" and tokens[2][0] == "ASSIGN" and tokens[3][0].startswith("LITERAL") and tokens[4][0] == "DELIMITER"):
-            print("[PARSER] Actual structure matches expected rule perfectly.")
-            print("Syntax Analysis Complete. No structural errors.\n")
+            is_assignment = True
+            print("[PARSER] Standard Declaration structure verified.\n")
+        elif len(tokens) == 7 and (tokens[1][0] == "IDENTIFIER" and tokens[2][0] == "ASSIGN" and 
+                                   tokens[4][0] == "MATH_OP" and tokens[6][0] == "DELIMITER"):
+            is_math_assignment = True
+            print("[PARSER] Math Operation structure verified.\n")
         else:
             print("[PARSER] FATAL ERROR: Syntax is invalid. Fix your grammar.")
             return
+            
     elif tokens[0][0] == "OUTPUT_CMD":
         is_release = True
-        print("[PARSER] Expected rule: RELEASE [Identifier/Literal], EndThat :> (or similar list)")
         if tokens[-1][0] != "DELIMITER":
             print("[PARSER] FATAL ERROR: Missing delimiter ':>' at the end.")
             return
-        print("[PARSER] Structure accepted for RELEASE command.")
-        print("Syntax Analysis Complete. No structural errors.\n")
+        print("[PARSER] Structure accepted for RELEASE command.\n")
     else:
         print("[PARSER] FATAL ERROR: Unknown statement structure.")
         return
 
     print("--- STARTING SEMANTIC ANALYSIS ---")
     if is_assignment:
-        print("[SEMANTICS] Checking Type Compatibility...")
         var_type, var_name, var_value, literal_type = tokens[0][1], tokens[1][1], tokens[3][1], tokens[3][0]
-        print(f"[SEMANTICS] Variable '{var_name}' is declared as '{var_type}'. Value is '{var_value}'.")
         
         is_valid_type = (var_type == "OUNT" and literal_type == "LITERAL_INT") or \
                         (var_type == "YEARN" and literal_type == "LITERAL_STRING") or \
@@ -143,15 +166,32 @@ def lgf_compiler(source_code):
                         (var_type == "TAMARAW" and literal_type == "LITERAL_BOOL")
 
         if is_valid_type:
-            print("[SEMANTICS] Types match. No coercion needed.")
             symbol_table[var_name] = {"type": var_type, "value": var_value}
             print(f"[SEMANTICS] Binding variable '{var_name}' to Symbol Table.")
-            print("Semantic Analysis Complete.")
         else:
             print(f"[SEMANTICS] FATAL ERROR: Type mismatch. Cannot put {literal_type} into {var_type}.")
             
+    elif is_math_assignment:
+        var_type, var_name = tokens[0][1], tokens[1][1]
+        val1, operator, val2 = tokens[3][1], tokens[4][1], tokens[5][1]
+        
+        if var_type != "OUNT":
+            print("[SEMANTICS] FATAL ERROR: Math operations are only allowed for OUNT types.")
+            return
+            
+        try:
+            if operator == "+": result = int(val1) + int(val2)
+            elif operator == "-": result = int(val1) - int(val2)
+            elif operator == "*": result = int(val1) * int(val2)
+            elif operator == "/": result = int(val1) // int(val2)
+            
+            symbol_table[var_name] = {"type": "OUNT", "value": result}
+            print(f"[SEMANTICS] Computed {val1} {operator} {val2} = {result}.")
+            print(f"[SEMANTICS] Binding variable '{var_name}' to Symbol Table.")
+        except Exception:
+            print("[SEMANTICS] FATAL ERROR: Invalid math operation.")
+            
     elif is_release:
-        print("[SEMANTICS] Executing Output Command...")
         output_string = ""
         for i in range(1, len(tokens) - 1):
             tok_type, tok_val = tokens[i]
@@ -202,8 +242,12 @@ def execute_code():
         return
 
     quest_passed = False
+    
     if active_quest["target"] in ["OUNT", "YEARN", "TAMARAW", "HERO"]:
         if any(data["type"] == active_quest["target"] for data in symbol_table.values()):
+            quest_passed = True
+    elif active_quest["target"] == "OUNT_ZERO":
+        if any(data["type"] == "OUNT" and int(data["value"]) == 0 for data in symbol_table.values()):
             quest_passed = True
     elif active_quest["target"] == "RELEASE":
         if "RELEASE" in code:
@@ -224,6 +268,15 @@ def execute_code():
         has_tam = any(data["type"] == "TAMARAW" for data in symbol_table.values())
         has_ount = any(data["type"] == "OUNT" for data in symbol_table.values())
         if has_tam and has_ount:
+            quest_passed = True
+    elif active_quest["target"] == "MATH_ADD":
+        if "+" in code and any(data["type"] == "OUNT" for data in symbol_table.values()):
+            quest_passed = True
+    elif active_quest["target"] == "MATH_SUB":
+        if "-" in code and any(data["type"] == "OUNT" for data in symbol_table.values()):
+            quest_passed = True
+    elif active_quest["target"] == "MATH_COMBO_MUL":
+        if "*" in code and "RELEASE" in code:
             quest_passed = True
 
     if quest_passed:
@@ -252,39 +305,69 @@ def next_quest():
     btn_next.pack_forget()
     btn_execute.config(state=tk.NORMAL)
 
+# --- THE GACHA ANIMATION SYSTEM ---
 def pull_gacha():
-    global lgf_coins, inventory
+    global lgf_coins, inventory, is_pulling
     
-    loot_pool = [
-        "Cyberpunk Neon Syntax", "Hacker Terminal Font", "Abyssal Void Dark Mode", 
-        "OLED Pure Black", "Solar Flare Light Mode", "Ocean Trench Deep Blue", 
-        "Crimson Bloodline", "Synthwave Sunset", "Matrix Glitch", 
-        "THE GOLDEN COMPILER", "FEU TAMARAWS"
-    ]
+    if is_pulling: return # Prevent spam clicking during animation
     
-    # 9 normals at 11%, 2 super rares at 0.5% (Total 100%)
-    drop_rates = [11, 11, 11, 11, 11, 11, 11, 11, 10, 1, 1] 
+    loot_pool = list(themes.keys())
+    loot_pool.remove("Default Theme")
+    drop_rates = [10.7, 10.7, 10.7, 10.7, 10.7, 10.7, 10.7, 10.7, 11.4, 1, 1, 1] 
     
     if lgf_coins >= 100:
         lgf_coins -= 100
+        update_coin_labels()
+        
+        # Lock the UI for the animation
+        is_pulling = True
+        btn_pull.config(state=tk.DISABLED)
+        
+        # Pre-determine the winner silently
         won_item = random.choices(loot_pool, weights=drop_rates, k=1)[0]
         
-        if won_item not in inventory: 
-            inventory.append(won_item)
-            inventory_listbox.insert(tk.END, won_item)
-            
-            if won_item in ["THE GOLDEN COMPILER", "FEU TAMARAWS"]:
-                gacha_result.config(text=f"[LEGENDARY DROP] YOU UNLOCKED: [{won_item}]!!!", fg=themes[won_item]["accent"])
+        # Animation config
+        flashes = 20
+        base_delay = 40
+        
+        def animate_roll(current_flash):
+            if current_flash < flashes:
+                # Flash fake items to build hype
+                fake_item = random.choice(loot_pool)
+                gacha_result.config(text=f"Rolling... [{fake_item}]", fg="white")
+                
+                # Math trick to make the flashing slow down exponentially
+                next_delay = base_delay + int((current_flash ** 1.5) * 2) 
+                root.after(next_delay, animate_roll, current_flash + 1)
             else:
-                gacha_result.config(text=f"[SUCCESS] YOU UNLOCKED: [{won_item}]", fg=themes[won_item]["success"])
-        else:
-            lgf_coins += 25
-            gacha_result.config(text=f"[DUPLICATE] Pulled {won_item}. Refunded 25 Coins.", fg="#888888")
-            
+                # Deliver the actual result
+                finalize_pull(won_item)
+                
+        animate_roll(0) # Start the loop
+        
     else:
         gacha_result.config(text="[ERROR] Insufficient funds. Complete more quests.", fg="#ff4c4c")
+
+def finalize_pull(won_item):
+    """Handles the actual reward logic after the animation finishes."""
+    global is_pulling, lgf_coins
     
-    update_coin_labels()
+    if won_item not in inventory: 
+        inventory.append(won_item)
+        inventory_listbox.insert(tk.END, won_item)
+        
+        if won_item in ["THE GOLDEN COMPILER", "FEU TAMARAWS", "FEU TECH ACM"]:
+            gacha_result.config(text=f"[LEGENDARY DROP] YOU UNLOCKED: [{won_item}]!!!", fg=themes[won_item]["accent"])
+        else:
+            gacha_result.config(text=f"[SUCCESS] YOU UNLOCKED: [{won_item}]", fg=themes[won_item]["success"])
+    else:
+        lgf_coins += 25
+        update_coin_labels()
+        gacha_result.config(text=f"[DUPLICATE] Pulled {won_item}. Refunded 25 Coins.", fg="#888888")
+        
+    # Unlock the UI again
+    is_pulling = False
+    btn_pull.config(state=tk.NORMAL)
 
 def equip_item():
     global equipped_theme
@@ -301,55 +384,44 @@ def equip_item():
 
 # --- DEV TOOLS ---
 def enable_dev_mode(event=None):
-    """Secret backdoor to instantly unlock all themes and grant max coins."""
-    global lgf_coins, inventory
+    """Dev mode now ONLY injects funds for gacha testing."""
+    global lgf_coins
     lgf_coins += 99999
     update_coin_labels()
-    
-    for theme_name in themes.keys():
-        if theme_name not in inventory:
-            inventory.append(theme_name)
-            inventory_listbox.insert(tk.END, theme_name)
-            
-    lbl_menu_dev.config(text="[ GOD MODE ACTIVATED ]", fg="#ffd700")
+    lbl_menu_dev.config(text="[ DEV FUNDS INJECTED ]", fg="#ffd700")
 
 def disable_dev_mode(event=None):
     """Wipes the account clean to test the mortal grind."""
     global lgf_coins, inventory, equipped_theme
     
-    # Burn the vault
     lgf_coins = 0
     update_coin_labels()
     
-    # Wipe inventory and restore only Default
     inventory = ["Default Theme"]
     inventory_listbox.delete(0, tk.END)
     inventory_listbox.insert(tk.END, "Default Theme")
     
-    # Force unequip everything
     equipped_theme = "Default Theme"
     lbl_equipped.config(text=f"Equipped: [{equipped_theme}]")
     apply_theme("Default Theme")
     
-    # Reset UI headers
     lbl_menu_dev.config(text="Developer Edition", fg=themes["Default Theme"]["accent"])
     gacha_result.config(text="Account wiped. Awaiting transaction...", fg="white")
 
 def apply_theme(theme_name):
-    """Aggressively repaints every single widget to eliminate artifacting."""
     t = themes[theme_name]
     
     root.configure(bg=t["bg"])
     for frame in [menu_frame, coding_frame, gacha_frame, cheat_frame, pull_left, codex_container, btn_action_frame]:
         frame.configure(bg=t["bg"])
         
-    for frame in [mission_frame, inv_right, type_card, syntax_card]:
+    for frame in [mission_frame, inv_right, type_card, op_card, syntax_card]:
         frame.configure(bg=t["panel"], highlightbackground=t["accent"])
     mission_frame.configure(highlightbackground=t["success"]) 
     
     lbl_menu_title.configure(bg=t["bg"], fg=t["text"])
     
-    if lbl_menu_dev.cget("text") != "[ GOD MODE ACTIVATED ]":
+    if lbl_menu_dev.cget("text") not in ["[ GOD MODE ACTIVATED ]", "[ DEV FUNDS INJECTED ]"]:
         lbl_menu_dev.configure(bg=t["bg"], fg=t["accent"])
     else:
         lbl_menu_dev.configure(bg=t["bg"]) 
@@ -381,8 +453,13 @@ def apply_theme(theme_name):
     
     btn_back_codex.configure(bg=t["panel"], fg=t["text"])
     lbl_codex_title.configure(bg=t["bg"], fg=t["accent"])
+    
     lbl_type_title.configure(bg=t["panel"], fg=t["text"])
     lbl_type_text.configure(bg=t["panel"], fg=t["text"])
+    
+    lbl_op_title.configure(bg=t["panel"], fg=t["text"])
+    lbl_op_text.configure(bg=t["panel"], fg=t["text"])
+    
     lbl_syntax_title.configure(bg=t["panel"], fg=t["text"])
     lbl_syntax_text.configure(bg=t["panel"], fg=t["text"])
 
@@ -511,41 +588,58 @@ lbl_codex_title = tk.Label(cheat_frame, text="LGF CODEX", font=("Consolas", 28, 
 lbl_codex_title.pack(pady=10)
 
 codex_container = tk.Frame(cheat_frame)
-codex_container.pack(fill=tk.BOTH, expand=True, padx=40, pady=20)
+codex_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
+# --- CARD 1: DATA TYPES ---
 type_card = tk.Frame(codex_container, bd=1, relief="solid", highlightthickness=2)
 type_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
 
-lbl_type_title = tk.Label(type_card, text="PRIMITIVE TYPES", font=("Consolas", 16, "bold"))
+lbl_type_title = tk.Label(type_card, text="DATA TYPES", font=("Consolas", 16, "bold"))
 lbl_type_title.pack(pady=(20, 10))
 
-types_text = """OUNT    : Integer (Numeric values only)
-YEARN   : String (Requires "Double Quotes")
-HERO    : Character (Requires 'Single Quotes')
-TAMARAW : Boolean (Must be True or False)
+types_text = """OUNT    : Integer values
+YEARN   : Text/String values
+HERO    : Single character values
+TAMARAW : Boolean true/false
 
-*WARNING: The Lexer is case-sensitive and
-enforces strict quotation marks."""
-
+*WARNING: Lexer is case-sensitive!
+Strings need "Double Quotes"."""
 lbl_type_text = tk.Label(type_card, text=types_text, font=("Consolas", 12), justify="left")
 lbl_type_text.pack(anchor="w", padx=20, pady=10)
 
-syntax_card = tk.Frame(codex_container, bd=1, relief="solid", highlightthickness=2)
-syntax_card.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10)
+# --- CARD 2: OPERATORS & I/O ---
+op_card = tk.Frame(codex_container, bd=1, relief="solid", highlightthickness=2)
+op_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
 
-lbl_syntax_title = tk.Label(syntax_card, text="CORE SYNTAX", font=("Consolas", 16, "bold"))
+lbl_op_title = tk.Label(op_card, text="OPERATORS & I/O", font=("Consolas", 16, "bold"))
+lbl_op_title.pack(pady=(20, 10))
+
+op_text = """OPERATORS:
+IS : Assignment Operator (=)
+:> : Statement Delimiter (;)
+
+I/O KEYWORDS:
+RELEASE : Output display data
+EndThat : Line break (\\n)"""
+lbl_op_text = tk.Label(op_card, text=op_text, font=("Consolas", 12), justify="left")
+lbl_op_text.pack(anchor="w", padx=20, pady=10)
+
+# --- CARD 3: GRAMMAR RULES ---
+syntax_card = tk.Frame(codex_container, bd=1, relief="solid", highlightthickness=2)
+syntax_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+
+lbl_syntax_title = tk.Label(syntax_card, text="GRAMMAR RULES", font=("Consolas", 16, "bold"))
 lbl_syntax_title.pack(pady=(20, 10))
 
-syntax_text = """DECLARATION RULE:
-[Type] [Name] IS [Value] :>
+syntax_text = """VARIABLE DECLARATION:
+[Type] [Name] IS [Literal] :>
 Ex: OUNT age IS 21 :>
 
-OUTPUT COMMAND:
-RELEASE [Variable], EndThat :>
+OUTPUT STATEMENT:
+RELEASE [Identifier], EndThat :>
 Ex: RELEASE age, EndThat :>"""
-
-lbl_syntax_text = tk.Label(syntax_card, text=syntax_text, font=("Consolas", 14), justify="left")
-lbl_syntax_text.pack(anchor="w", padx=30, pady=10)
+lbl_syntax_text = tk.Label(syntax_card, text=syntax_text, font=("Consolas", 12), justify="left")
+lbl_syntax_text.pack(anchor="w", padx=20, pady=10)
 
 # --- STARTUP ---
 show_frame(menu_frame)
