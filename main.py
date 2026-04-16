@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import scrolledtext
 import sys
 import random
+import json
+import os
 
 # --- GAME STATE & QUEST ENGINE ---
 lgf_coins = 0
@@ -11,7 +13,35 @@ equipped_theme = "Default Theme"
 
 quests_completed = 0
 current_difficulty = "EASY"
-is_pulling = False # Prevents spam-clicking the gacha button
+is_pulling = False 
+
+# --- THE SAVE SYSTEM ---
+SAVE_FILE = "lgf_save_data.json"
+
+def load_progress():
+    global lgf_coins, inventory, equipped_theme, quests_completed
+    if os.path.exists(SAVE_FILE):
+        try:
+            with open(SAVE_FILE, "r") as f:
+                data = json.load(f)
+                lgf_coins = data.get("coins", 0)
+                inventory = data.get("inventory", ["Default Theme"])
+                equipped_theme = data.get("equipped_theme", "Default Theme")
+                quests_completed = data.get("quests_completed", 0)
+        except Exception as e:
+            print(f"Error loading save data: {e}")
+
+def save_progress():
+    data = {
+        "coins": lgf_coins,
+        "inventory": inventory,
+        "equipped_theme": equipped_theme,
+        "quests_completed": quests_completed
+    }
+    with open(SAVE_FILE, "w") as f:
+        json.dump(data, f)
+
+load_progress()
 
 # --- THE POLISHED THEME ENGINE DICTIONARY ---
 themes = {
@@ -54,19 +84,15 @@ quest_db = {
 }
 
 def generate_quest():
-    """Dynamic pacing system based on quests completed."""
     global current_difficulty
     
     if quests_completed < 3:
-        # Phase 1: Tutorial
         current_difficulty = "EASY"
     elif quests_completed < 8:
-        # Phase 2: Ramp Up
         tiers = ["EASY", "MEDIUM"]
         weights = [30, 70] 
         current_difficulty = random.choices(tiers, weights=weights, k=1)[0]
     else:
-        # Phase 3: The Gauntlet
         tiers = ["EASY", "MEDIUM", "HARD"]
         weights = [15, 35, 50] 
         current_difficulty = random.choices(tiers, weights=weights, k=1)[0]
@@ -92,44 +118,31 @@ def lgf_compiler(source_code):
     for word in words:
         if word in ["OUNT", "HERO", "TAMARAW", "YEARN"]:
             tokens.append(("DATATYPE", word))
-            print(f"[LEXER] Found '{word}' -> Identified as DATATYPE")
         elif word == "IS":
             tokens.append(("ASSIGN", word))
-            print(f"[LEXER] Found '{word}' -> Identified as ASSIGN OPERATOR")
         elif word == ":>":
             tokens.append(("DELIMITER", word))
-            print(f"[LEXER] Found '{word}' -> Identified as DELIMITER")
         elif word == "RELEASE":
             tokens.append(("OUTPUT_CMD", word))
-            print(f"[LEXER] Found '{word}' -> Identified as OUTPUT_CMD")
         elif word == "EndThat":
             tokens.append(("NEWLINE", word))
-            print(f"[LEXER] Found '{word}' -> Identified as NEWLINE")
         elif word == ",":
             tokens.append(("COMMA", word))
-            print(f"[LEXER] Found '{word}' -> Identified as COMMA")
         elif word in ["+", "-", "*", "/"]:
             tokens.append(("MATH_OP", word))
-            print(f"[LEXER] Found '{word}' -> Identified as MATH_OP")
         elif word.isdigit():
             tokens.append(("LITERAL_INT", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_INT")
         elif word.startswith('"') and word.endswith('"'):
             tokens.append(("LITERAL_STRING", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_STRING")
         elif word.startswith("'") and word.endswith("'") and len(word) == 3:
             tokens.append(("LITERAL_CHAR", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_CHAR")
         elif word in ["True", "False"]:
             tokens.append(("LITERAL_BOOL", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_BOOL")
         else:
             tokens.append(("IDENTIFIER", word))
-            print(f"[LEXER] Found '{word}' -> Identified as IDENTIFIER")
     print("Lexical Analysis Complete.\n")
 
     print("--- STARTING SYNTAX ANALYSIS ---")
-    print("[PARSER] Checking statement structure...")
     is_assignment = False
     is_math_assignment = False
     is_release = False
@@ -145,7 +158,6 @@ def lgf_compiler(source_code):
         else:
             print("[PARSER] FATAL ERROR: Syntax is invalid. Fix your grammar.")
             return
-            
     elif tokens[0][0] == "OUTPUT_CMD":
         is_release = True
         if tokens[-1][0] != "DELIMITER":
@@ -167,7 +179,7 @@ def lgf_compiler(source_code):
 
         if is_valid_type:
             symbol_table[var_name] = {"type": var_type, "value": var_value}
-            print(f"[SEMANTICS] Binding variable '{var_name}' to Symbol Table.")
+            print(f"[SEMANTICS] Binding '{var_name}' to Symbol Table.")
         else:
             print(f"[SEMANTICS] FATAL ERROR: Type mismatch. Cannot put {literal_type} into {var_type}.")
             
@@ -178,7 +190,6 @@ def lgf_compiler(source_code):
         if var_type != "OUNT":
             print("[SEMANTICS] FATAL ERROR: Math operations are only allowed for OUNT types.")
             return
-            
         try:
             if operator == "+": result = int(val1) + int(val2)
             elif operator == "-": result = int(val1) - int(val2)
@@ -186,8 +197,7 @@ def lgf_compiler(source_code):
             elif operator == "/": result = int(val1) // int(val2)
             
             symbol_table[var_name] = {"type": "OUNT", "value": result}
-            print(f"[SEMANTICS] Computed {val1} {operator} {val2} = {result}.")
-            print(f"[SEMANTICS] Binding variable '{var_name}' to Symbol Table.")
+            print(f"[SEMANTICS] Binding '{var_name}' to Symbol Table with value {result}.")
         except Exception:
             print("[SEMANTICS] FATAL ERROR: Invalid math operation.")
             
@@ -224,7 +234,7 @@ def execute_code():
     global symbol_table, lgf_coins, active_quest, quests_completed
     symbol_table.clear()
     
-    console_output.delete("1.0", tk.END)
+    console_output.insert(tk.END, "\n" + "="*50 + "\n[SYSTEM] INITIATING COMPILER CYCLE...\n")
     console_output.update() 
     
     code = code_input.get("1.0", tk.END).strip()
@@ -237,12 +247,13 @@ def execute_code():
         lgf_compiler(line)
     
     output_text = console_output.get("1.0", tk.END)
-    if "FATAL ERROR" in output_text:
+    
+    recent_output = output_text.split("[SYSTEM] INITIATING COMPILER CYCLE...")[-1]
+    if "FATAL ERROR" in recent_output:
         console_output.insert(tk.END, "\n[SYSTEM] Compilation failed. 0 Coins awarded. Fix your code.\n")
         return
 
     quest_passed = False
-    
     if active_quest["target"] in ["OUNT", "YEARN", "TAMARAW", "HERO"]:
         if any(data["type"] == active_quest["target"] for data in symbol_table.values()):
             quest_passed = True
@@ -286,6 +297,7 @@ def execute_code():
         
         console_output.insert(tk.END, f"\n[QUEST COMPLETE] Target acquired! +{reward} Coins.\n")
         update_coin_labels()
+        save_progress() 
         
         btn_execute.config(state=tk.DISABLED)
         btn_next.pack(side=tk.LEFT, padx=10)
@@ -299,17 +311,14 @@ def next_quest():
     lbl_quest.config(text=active_quest["task"]) 
     
     code_input.delete("1.0", tk.END)
-    console_output.delete("1.0", tk.END)
-    console_output.update() 
     
     btn_next.pack_forget()
     btn_execute.config(state=tk.NORMAL)
 
-# --- THE GACHA ANIMATION SYSTEM ---
 def pull_gacha():
     global lgf_coins, inventory, is_pulling
     
-    if is_pulling: return # Prevent spam clicking during animation
+    if is_pulling: return 
     
     loot_pool = list(themes.keys())
     loot_pool.remove("Default Theme")
@@ -318,38 +327,31 @@ def pull_gacha():
     if lgf_coins >= 100:
         lgf_coins -= 100
         update_coin_labels()
+        save_progress()
         
-        # Lock the UI for the animation
         is_pulling = True
         btn_pull.config(state=tk.DISABLED)
         
-        # Pre-determine the winner silently
         won_item = random.choices(loot_pool, weights=drop_rates, k=1)[0]
         
-        # Animation config
         flashes = 20
         base_delay = 40
         
         def animate_roll(current_flash):
             if current_flash < flashes:
-                # Flash fake items to build hype
                 fake_item = random.choice(loot_pool)
-                gacha_result.config(text=f"Rolling... [{fake_item}]", fg="white")
-                
-                # Math trick to make the flashing slow down exponentially
+                gacha_result.config(text=f"Rolling... [{fake_item}]", fg=themes["Default Theme"]["text"])
                 next_delay = base_delay + int((current_flash ** 1.5) * 2) 
                 root.after(next_delay, animate_roll, current_flash + 1)
             else:
-                # Deliver the actual result
                 finalize_pull(won_item)
                 
-        animate_roll(0) # Start the loop
+        animate_roll(0) 
         
     else:
         gacha_result.config(text="[ERROR] Insufficient funds. Complete more quests.", fg="#ff4c4c")
 
 def finalize_pull(won_item):
-    """Handles the actual reward logic after the animation finishes."""
     global is_pulling, lgf_coins
     
     if won_item not in inventory: 
@@ -362,10 +364,11 @@ def finalize_pull(won_item):
             gacha_result.config(text=f"[SUCCESS] YOU UNLOCKED: [{won_item}]", fg=themes[won_item]["success"])
     else:
         lgf_coins += 25
-        update_coin_labels()
         gacha_result.config(text=f"[DUPLICATE] Pulled {won_item}. Refunded 25 Coins.", fg="#888888")
         
-    # Unlock the UI again
+    update_coin_labels()
+    save_progress() 
+    
     is_pulling = False
     btn_pull.config(state=tk.NORMAL)
 
@@ -379,24 +382,22 @@ def equip_item():
         lbl_equipped.config(text=f"Equipped: [{equipped_theme}]")
         gacha_result.config(text=f"[SYSTEM] Equipped {equipped_theme} successfully.", fg=themes[equipped_theme]["accent"])
         apply_theme(equipped_theme)
+        save_progress() 
     else:
         gacha_result.config(text="[WARNING] Select an item from your vault first.", fg="#ff4c4c")
 
 # --- DEV TOOLS ---
 def enable_dev_mode(event=None):
-    """Dev mode now ONLY injects funds for gacha testing."""
     global lgf_coins
     lgf_coins += 99999
     update_coin_labels()
+    save_progress()
     lbl_menu_dev.config(text="[ DEV FUNDS INJECTED ]", fg="#ffd700")
 
 def disable_dev_mode(event=None):
-    """Wipes the account clean to test the mortal grind."""
     global lgf_coins, inventory, equipped_theme
     
     lgf_coins = 0
-    update_coin_labels()
-    
     inventory = ["Default Theme"]
     inventory_listbox.delete(0, tk.END)
     inventory_listbox.insert(tk.END, "Default Theme")
@@ -405,9 +406,13 @@ def disable_dev_mode(event=None):
     lbl_equipped.config(text=f"Equipped: [{equipped_theme}]")
     apply_theme("Default Theme")
     
+    update_coin_labels()
+    save_progress() 
+    
     lbl_menu_dev.config(text="Developer Edition", fg=themes["Default Theme"]["accent"])
-    gacha_result.config(text="Account wiped. Awaiting transaction...", fg="white")
+    gacha_result.config(text="Account wiped. Awaiting transaction...", fg=themes["Default Theme"]["text"])
 
+# --- THE UI ENGINE ---
 def apply_theme(theme_name):
     t = themes[theme_name]
     
@@ -445,7 +450,12 @@ def apply_theme(theme_name):
     lbl_market_title.configure(bg=t["bg"], fg=t["text"])
     lbl_gacha_coins.configure(bg=t["bg"], fg=t["success"])
     btn_pull.configure(bg=t["accent"], fg=t["btn_fg"])
-    gacha_result.configure(bg=t["bg"]) 
+    
+    if "SUCCESS" not in gacha_result.cget("text") and "LEGENDARY" not in gacha_result.cget("text"):
+        gacha_result.configure(bg=t["bg"], fg=t["text"])
+    else:
+        gacha_result.configure(bg=t["bg"])
+        
     lbl_vault_title.configure(bg=t["panel"], fg=t["text"])
     lbl_equipped.configure(bg=t["panel"], fg=t["success"])
     inventory_listbox.configure(bg=t["bg"], fg=t["text"], selectbackground=t["accent"], selectforeground=t["btn_fg"])
@@ -463,7 +473,6 @@ def apply_theme(theme_name):
     lbl_syntax_title.configure(bg=t["panel"], fg=t["text"])
     lbl_syntax_text.configure(bg=t["panel"], fg=t["text"])
 
-# --- THE ROUTER ---
 def show_frame(frame_to_show):
     menu_frame.pack_forget()
     coding_frame.pack_forget()
@@ -573,7 +582,8 @@ lbl_equipped.pack(pady=(0, 15))
 inventory_listbox = tk.Listbox(inv_right, font=("Consolas", 12), bd=0, highlightthickness=1)
 inventory_listbox.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 15))
 
-inventory_listbox.insert(tk.END, "Default Theme")
+for item in inventory:
+    inventory_listbox.insert(tk.END, item)
 
 btn_equip = tk.Button(inv_right, text="EQUIP SELECTED", font=("Consolas", 12, "bold"), command=equip_item)
 btn_equip.pack(fill=tk.X, padx=20, pady=(0, 20))
@@ -643,7 +653,7 @@ lbl_syntax_text.pack(anchor="w", padx=20, pady=10)
 
 # --- STARTUP ---
 show_frame(menu_frame)
-apply_theme("Default Theme") 
+apply_theme(equipped_theme) 
 
 # SECRET HOTKEYS
 root.bind('<F9>', enable_dev_mode)
