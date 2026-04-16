@@ -43,21 +43,21 @@ def save_progress():
 
 load_progress()
 
-# --- THE POLISHED THEME ENGINE DICTIONARY ---
+# --- THE PREMIUM RETRO THEME ENGINE ---
 themes = {
-    "Default Theme": {"bg": "#13111C", "panel": "#1E1E1E", "accent": "#007acc", "text": "white", "success": "#4af626", "btn_fg": "white"},
-    "Cyberpunk Neon Syntax": {"bg": "#0d0221", "panel": "#261447", "accent": "#f706d2", "text": "#0ff0fc", "success": "#00ff00", "btn_fg": "white"},
-    "Hacker Terminal Font": {"bg": "#000000", "panel": "#0a0a0a", "accent": "#00ff00", "text": "#00ff00", "success": "#00ff00", "btn_fg": "black"},
-    "Abyssal Void Dark Mode": {"bg": "#050505", "panel": "#0f0f0f", "accent": "#8a0303", "text": "#d3d3d3", "success": "#ff3333", "btn_fg": "white"},
-    "OLED Pure Black": {"bg": "#000000", "panel": "#0a0a0a", "accent": "#ffffff", "text": "#ffffff", "success": "#aaaaaa", "btn_fg": "black"},
-    "Solar Flare Light Mode": {"bg": "#fdf6e3", "panel": "#eee8d5", "accent": "#b58900", "text": "#073642", "success": "#859900", "btn_fg": "white"},
-    "Ocean Trench Deep Blue": {"bg": "#001b2e", "panel": "#002a4a", "accent": "#00a8cc", "text": "#e0fbfc", "success": "#00f5d4", "btn_fg": "black"},
-    "Crimson Bloodline": {"bg": "#1a0000", "panel": "#330000", "accent": "#ff0000", "text": "#ffcccc", "success": "#ff4d4d", "btn_fg": "white"},
-    "Synthwave Sunset": {"bg": "#2b0f4c", "panel": "#3d1466", "accent": "#ff9e00", "text": "#f706d2", "success": "#ff007f", "btn_fg": "black"},
-    "Matrix Glitch": {"bg": "#001100", "panel": "#002200", "accent": "#33ff33", "text": "#ccffcc", "success": "#66ff66", "btn_fg": "black"},
-    "THE GOLDEN COMPILER": {"bg": "#0B0800", "panel": "#1C1400", "accent": "#FFD700", "text": "#FFF2B2", "success": "#FFB300", "btn_fg": "black"},
-    "FEU TAMARAWS": {"bg": "#014421", "panel": "#012b15", "accent": "#F2A900", "text": "#ffffff", "success": "#FFD700", "btn_fg": "black"},
-    "FEU TECH ACM": {"bg": "#0a050f", "panel": "#140a1f", "accent": "#9d4edd", "text": "#e0caff", "success": "#c77dff", "btn_fg": "white"}
+    "Default Theme": {"bg": "#13111C", "panel": "#1E1E1E", "accent": "#007acc", "hover": "#0099ff", "text": "white", "success": "#4af626", "btn_fg": "white"},
+    "Cyberpunk Neon Syntax": {"bg": "#0d0221", "panel": "#261447", "accent": "#f706d2", "hover": "#ff33e0", "text": "#0ff0fc", "success": "#00ff00", "btn_fg": "white"},
+    "Hacker Terminal Font": {"bg": "#000000", "panel": "#0a0a0a", "accent": "#00ff00", "hover": "#33ff33", "text": "#00ff00", "success": "#00ff00", "btn_fg": "black"},
+    "Abyssal Void Dark Mode": {"bg": "#050505", "panel": "#0f0f0f", "accent": "#8a0303", "hover": "#b30000", "text": "#d3d3d3", "success": "#ff3333", "btn_fg": "white"},
+    "OLED Pure Black": {"bg": "#000000", "panel": "#0a0a0a", "accent": "#ffffff", "hover": "#cccccc", "text": "#ffffff", "success": "#aaaaaa", "btn_fg": "black"},
+    "Solar Flare Light Mode": {"bg": "#fdf6e3", "panel": "#eee8d5", "accent": "#b58900", "hover": "#d9a400", "text": "#073642", "success": "#859900", "btn_fg": "white"},
+    "Ocean Trench Deep Blue": {"bg": "#001b2e", "panel": "#002a4a", "accent": "#00a8cc", "hover": "#00c2eb", "text": "#e0fbfc", "success": "#00f5d4", "btn_fg": "black"},
+    "Crimson Bloodline": {"bg": "#1a0000", "panel": "#330000", "accent": "#ff0000", "hover": "#ff3333", "text": "#ffcccc", "success": "#ff4d4d", "btn_fg": "white"},
+    "Synthwave Sunset": {"bg": "#2b0f4c", "panel": "#3d1466", "accent": "#ff9e00", "hover": "#ffb733", "text": "#f706d2", "success": "#ff007f", "btn_fg": "black"},
+    "Matrix Glitch": {"bg": "#001100", "panel": "#002200", "accent": "#33ff33", "hover": "#66ff66", "text": "#ccffcc", "success": "#66ff66", "btn_fg": "black"},
+    "THE GOLDEN COMPILER": {"bg": "#0B0800", "panel": "#1C1400", "accent": "#FFD700", "hover": "#ffe033", "text": "#FFF2B2", "success": "#FFB300", "btn_fg": "black"},
+    "FEU TAMARAWS": {"bg": "#014421", "panel": "#012b15", "accent": "#F2A900", "hover": "#ffbb33", "text": "#ffffff", "success": "#FFD700", "btn_fg": "black"},
+    "FEU TECH ACM": {"bg": "#0a050f", "panel": "#140a1f", "accent": "#9d4edd", "hover": "#b366ff", "text": "#e0caff", "success": "#c77dff", "btn_fg": "white"}
 }
 
 quest_db = {
@@ -85,7 +85,6 @@ quest_db = {
 
 def generate_quest():
     global current_difficulty
-    
     if quests_completed < 3:
         current_difficulty = "EASY"
     elif quests_completed < 8:
@@ -110,8 +109,7 @@ def lgf_compiler(source_code):
     cleaned_code = cleaned_code.replace("+", " + ").replace("-", " - ").replace("*", " * ").replace("/", " / ")
     words = cleaned_code.split()
     
-    if not words:
-        return
+    if not words: return
 
     print("--- STARTING LEXICAL ANALYSIS ---")
     tokens = []
@@ -247,8 +245,8 @@ def execute_code():
         lgf_compiler(line)
     
     output_text = console_output.get("1.0", tk.END)
-    
     recent_output = output_text.split("[SYSTEM] INITIATING COMPILER CYCLE...")[-1]
+    
     if "FATAL ERROR" in recent_output:
         console_output.insert(tk.END, "\n[SYSTEM] Compilation failed. 0 Coins awarded. Fix your code.\n")
         return
@@ -306,15 +304,13 @@ def execute_code():
 
 def next_quest():
     global active_quest
-    
     active_quest = generate_quest()
     lbl_quest.config(text=active_quest["task"]) 
-    
     code_input.delete("1.0", tk.END)
-    
     btn_next.pack_forget()
     btn_execute.config(state=tk.NORMAL)
 
+# --- THE GACHA ANIMATION SYSTEM ---
 def pull_gacha():
     global lgf_coins, inventory, is_pulling
     
@@ -333,7 +329,6 @@ def pull_gacha():
         btn_pull.config(state=tk.DISABLED)
         
         won_item = random.choices(loot_pool, weights=drop_rates, k=1)[0]
-        
         flashes = 20
         base_delay = 40
         
@@ -412,9 +407,26 @@ def disable_dev_mode(event=None):
     lbl_menu_dev.config(text="Developer Edition", fg=themes["Default Theme"]["accent"])
     gacha_result.config(text="Account wiped. Awaiting transaction...", fg=themes["Default Theme"]["text"])
 
+def unlock_all_skins(event=None):
+    """Secret backdoor to instantly unlock all themes without giving coins."""
+    global inventory
+    
+    for theme_name in themes.keys():
+        if theme_name not in inventory:
+            inventory.append(theme_name)
+            inventory_listbox.insert(tk.END, theme_name)
+            
+    save_progress()
+    lbl_menu_dev.config(text="[ ALL SKINS UNLOCKED ]", fg="#ffd700")
+
 # --- THE UI ENGINE ---
 def apply_theme(theme_name):
     t = themes[theme_name]
+    
+    # --- HOVER ENGINE HELPER ---
+    def bind_hover(btn, default_bg, hover_bg):
+        btn.bind("<Enter>", lambda e, b=btn, c=hover_bg: b.configure(bg=c))
+        btn.bind("<Leave>", lambda e, b=btn, c=default_bg: b.configure(bg=c))
     
     root.configure(bg=t["bg"])
     for frame in [menu_frame, coding_frame, gacha_frame, cheat_frame, pull_left, codex_container, btn_action_frame]:
@@ -426,30 +438,53 @@ def apply_theme(theme_name):
     
     lbl_menu_title.configure(bg=t["bg"], fg=t["text"])
     
-    if lbl_menu_dev.cget("text") not in ["[ GOD MODE ACTIVATED ]", "[ DEV FUNDS INJECTED ]"]:
+    if lbl_menu_dev.cget("text") not in ["[ GOD MODE ACTIVATED ]", "[ DEV FUNDS INJECTED ]", "[ ALL SKINS UNLOCKED ]"]:
         lbl_menu_dev.configure(bg=t["bg"], fg=t["accent"])
     else:
         lbl_menu_dev.configure(bg=t["bg"]) 
         
     lbl_menu_coins.configure(bg=t["bg"], fg=t["success"])
-    btn_menu_arena.configure(bg=t["accent"], fg=t["btn_fg"])
-    btn_menu_market.configure(bg=t["panel"], fg=t["text"])
-    btn_menu_codex.configure(bg=t["panel"], fg=t["text"])
     
-    btn_back_arena.configure(bg=t["panel"], fg=t["text"])
+    # --- APPLYING HOVER EFFECTS TO BUTTONS ---
+    btn_menu_arena.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
+    bind_hover(btn_menu_arena, t["accent"], t["hover"])
+    
+    btn_menu_market.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
+    bind_hover(btn_menu_market, t["panel"], t["accent"])
+    
+    btn_menu_codex.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
+    bind_hover(btn_menu_codex, t["panel"], t["accent"])
+    
+    btn_back_arena.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
+    bind_hover(btn_back_arena, t["panel"], t["accent"])
+    
+    btn_execute.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
+    bind_hover(btn_execute, t["accent"], t["hover"])
+    
+    btn_next.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
+    bind_hover(btn_next, t["panel"], t["accent"])
+    
+    btn_back_market.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
+    bind_hover(btn_back_market, t["panel"], t["accent"])
+    
+    btn_pull.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
+    bind_hover(btn_pull, t["accent"], t["hover"])
+    
+    btn_equip.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
+    bind_hover(btn_equip, t["accent"], t["hover"])
+    
+    btn_back_codex.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
+    bind_hover(btn_back_codex, t["panel"], t["accent"])
+
+    # UI updates
     lbl_quest.configure(bg=t["panel"], fg=t["success"])
     code_input.configure(bg=t["panel"], fg=t["text"], insertbackground=t["text"])
-    btn_execute.configure(bg=t["accent"], fg=t["btn_fg"])
-    btn_next.configure(bg=t["panel"], fg=t["text"])
-    
     console_container.configure(bg=t["bg"], highlightbackground=t["panel"])
     console_header.configure(bg=t["panel"], fg=t["text"])
     console_output.configure(bg=t["bg"], fg=t["success"])
     
-    btn_back_market.configure(bg=t["panel"], fg=t["text"])
     lbl_market_title.configure(bg=t["bg"], fg=t["text"])
     lbl_gacha_coins.configure(bg=t["bg"], fg=t["success"])
-    btn_pull.configure(bg=t["accent"], fg=t["btn_fg"])
     
     if "SUCCESS" not in gacha_result.cget("text") and "LEGENDARY" not in gacha_result.cget("text"):
         gacha_result.configure(bg=t["bg"], fg=t["text"])
@@ -459,17 +494,12 @@ def apply_theme(theme_name):
     lbl_vault_title.configure(bg=t["panel"], fg=t["text"])
     lbl_equipped.configure(bg=t["panel"], fg=t["success"])
     inventory_listbox.configure(bg=t["bg"], fg=t["text"], selectbackground=t["accent"], selectforeground=t["btn_fg"])
-    btn_equip.configure(bg=t["accent"], fg=t["btn_fg"])
     
-    btn_back_codex.configure(bg=t["panel"], fg=t["text"])
     lbl_codex_title.configure(bg=t["bg"], fg=t["accent"])
-    
     lbl_type_title.configure(bg=t["panel"], fg=t["text"])
     lbl_type_text.configure(bg=t["panel"], fg=t["text"])
-    
     lbl_op_title.configure(bg=t["panel"], fg=t["text"])
     lbl_op_text.configure(bg=t["panel"], fg=t["text"])
-    
     lbl_syntax_title.configure(bg=t["panel"], fg=t["text"])
     lbl_syntax_text.configure(bg=t["panel"], fg=t["text"])
 
@@ -487,6 +517,7 @@ def update_coin_labels():
 # --- GUI SETUP ---
 root = tk.Tk()
 root.geometry("1280x720")
+root.state("zoomed") 
 root.title("LGF Client")
 
 menu_frame = tk.Frame(root)
@@ -600,7 +631,6 @@ lbl_codex_title.pack(pady=10)
 codex_container = tk.Frame(cheat_frame)
 codex_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-# --- CARD 1: DATA TYPES ---
 type_card = tk.Frame(codex_container, bd=1, relief="solid", highlightthickness=2)
 type_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
 
@@ -617,7 +647,6 @@ Strings need "Double Quotes"."""
 lbl_type_text = tk.Label(type_card, text=types_text, font=("Consolas", 12), justify="left")
 lbl_type_text.pack(anchor="w", padx=20, pady=10)
 
-# --- CARD 2: OPERATORS & I/O ---
 op_card = tk.Frame(codex_container, bd=1, relief="solid", highlightthickness=2)
 op_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
 
@@ -634,7 +663,6 @@ EndThat : Line break (\\n)"""
 lbl_op_text = tk.Label(op_card, text=op_text, font=("Consolas", 12), justify="left")
 lbl_op_text.pack(anchor="w", padx=20, pady=10)
 
-# --- CARD 3: GRAMMAR RULES ---
 syntax_card = tk.Frame(codex_container, bd=1, relief="solid", highlightthickness=2)
 syntax_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
 
@@ -658,5 +686,6 @@ apply_theme(equipped_theme)
 # SECRET HOTKEYS
 root.bind('<F9>', enable_dev_mode)
 root.bind('<F10>', disable_dev_mode)
+root.bind('<F11>', unlock_all_skins) # The Wardrobe Override
 
 root.mainloop()
