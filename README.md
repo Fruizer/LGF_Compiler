@@ -1,62 +1,48 @@
-# LGF Compiler IDE: Gamified Edition
+## LGF Compiler OS
 
-A custom programming language compiler and Integrated Development Environment (IDE) built entirely in Python. 
+**A Gamified, Retro-Arcade Development Environment and Custom Language Compiler**
 
-The LGF Compiler performs real-time **Lexical**, **Syntax**, and **Semantic Analysis** to tokenize code, enforce strict grammatical rules, and ensure type safety. 
+LGF Compiler OS is a fully functional, gamified IDE built in Python. It features a custom-built compiler pipeline (Lexical, Syntax, and Semantic analysis) designed to parse and execute the proprietary **LGF Syntax**. Wrapped in a cinematic, 8-bit retro arcade aesthetic, the client turns programming into a game where developers complete coding missions to earn currency, roll for cosmetic themes in a Gacha Marketplace, and rank up their skills.
 
-To make learning the custom syntax engaging, this IDE features built-in **RPG mechanics**. Users can track active learning quests, earn "LGF Coins" for writing bug-free code, and eventually spend them in a Gacha-style storefront.
+##  Core Features
 
-## Tech Stack
-* **Language:** Python 3
-* **GUI Framework:** Tkinter
-* **Core Concepts:** Tokenization, Abstract Syntax Parsing, Symbol Tables, Gamification / State Management
+* **Custom Compiler Engine:** A ground-up parser that processes the LGF syntax, strictly enforcing data types, grammar rules, and semantic logic before execution.
+* **Gamified Mission System:** A dynamic quest engine that scales in difficulty. Traverse through 4 tiers of complexity (Easy, Medium, Hard, and EXTREME) to earn coins. 
+* **The Marketplace (Gacha Economy):** Spend hard-earned coins to pull for IDE skins. Features a weighted RNG system with Normal (9.1%), Epic (3%), and Legendary (1%) drop rates. 
+* **Cinematic Retro UI:** Built with pure Tkinter but engineered to feel like a high-end arcade cabinet. Features 3D extruded geometry, tactile hover states, live syntax highlighting, and a CRT-style typewriter terminal effect.
+* **Persistent Progression:** A local JSON save state architecture that permanently tracks your coin vault, unlocked inventory, and equipped themes across sessions.
 
----
+## The LGF Syntax (Documentation)
 
-## Gamification Features
-
-* **Active Quest Board:** A built-in tutorial system that assigns coding missions (e.g., "Declare an OUNT variable").
-* **LGF Coin Economy:** A state tracker for user currency, laying the groundwork for rewarding successful compilation.
-* **Gacha System (WIP):** A storefront allowing users to spend earned coins on cosmetic IDE unlocks.
-
----
-
-## The LGF Language Architecture
-
-The LGF language uses a custom syntax with strict typing and delimiter rules.
+The LGF language is strictly typed and requires precise grammar. 
 
 ### Data Types
-| Keyword | Standard Equivalent |
-| :--- | :--- |
-| `OUNT` | Integer |
-| `HERO` | Character |
-| `TAMARAW` | Boolean |
-| `YEARN` | String |
+* `OUNT` : Integer values (e.g., `100`)
+* `YEARN` : String values (must be enclosed in double quotes, e.g., `"Gilberto"`)
+* `HERO` : Single Character (must be enclosed in single quotes, e.g., `'A'`)
+* `TAMARAW` : Boolean values (`True` or `False`)
 
-### Operators & Delimiters
-* `IS` : Assignment Operator (equivalent to `=`)
-* `:>` : End-of-Statement Delimiter (equivalent to `;`)
-* `,` : Item Separator
+### Operators & I/O
+* `IS` : Assignment Operator (Functions as `=`)
+* `:>` : Statement Delimiter (Functions as `;` and is required at the end of lines)
+* `RELEASE` : Output Command (Functions as `print`)
+* `EndThat` : Newline Command (Functions as `\n`)
 
-### I/O Commands
-* `RELEASE` : Standard Output (Print command)
-* `EndThat` : Newline Manipulator
+### Example Program
+```text
+OUNT age IS 21 :>
+YEARN name IS "Software Engineer" :>
+RELEASE name, EndThat :>
+```
 
----
+##  Developer Tools & Hotkeys
 
-## Compilation Phases
+For testing and debugging purposes, the OS includes built-in backdoor overrides:
+* `[ F9 ]` **Inject Funds:** Instantly adds 99,999 Coins to the Vault for testing Gacha economy rates.
+* `[ F10 ]` **Wipe Data:** Completely erases the local `lgf_save_data.json`, resetting the account to standard progression.
+* `[ F11 ]` **Wardrobe Override:** Instantly unlocks all standard, Epic, and Legendary skins (including *FEU TECH ACM*, *GILBERTO GREEN*, and *FEU TAMARAWS*) directly into the Vault.
 
-When code is executed in the IDE, the compiler processes it through three distinct phases:
-
-### 1. Lexical Analysis (Scanner)
-The compiler breaks down the raw string input into a stream of categorized tokens. It identifies literals, commands, and delimiters, flagging them for the parser.
-
-### 2. Syntax Analysis (Parser)
-The parser validates the token sequence against strict grammatical rules. 
-* **Variable Declarations** must follow: `[Type] [Name] IS [Value] :>`
-* If the structure is out of order, a fatal parsing error is thrown.
-
-### 3. Semantic Analysis (Type Checker)
-The compiler enforces strict type safety by cross-referencing the declared `DATATYPE` with the actual `LITERAL` provided. Valid variables are bound to the **Symbol Table** in memory.
 
 ---
+**Developed by Lorenzo Gilbert Flores** *BS Computer Science, Specialization in Software Engineering*
+```
