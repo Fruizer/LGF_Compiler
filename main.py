@@ -5,6 +5,36 @@ import random
 import json
 import os
 
+# --- AUDIO ENGINE (PYGAME) ---
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+import pygame
+
+pygame.mixer.init()
+sounds = {}
+
+def load_sounds():
+    try:
+        sounds['click'] = pygame.mixer.Sound("click.mp3")
+        sounds['right'] = pygame.mixer.Sound("rightAnswer.mp3")
+        sounds['wrong'] = pygame.mixer.Sound("wrongAnswer.mp3")
+        sounds['spin'] = pygame.mixer.Sound("spin.mp3")
+        sounds['gacha'] = pygame.mixer.Sound("gachagot.mp3")
+    except Exception as e:
+        print(f"[SYSTEM] Audio files missing or failed to load: {e}")
+
+load_sounds()
+
+def play_sound(name, loop=0):
+    """Plays a sound and returns the channel so it can be stopped if needed."""
+    if name in sounds:
+        try:
+            return sounds[name].play(loops=loop)
+        except:
+            pass
+    return None
+
+active_spin_channel = None # Used to track the looping spin sound
+
 # --- GAME STATE & QUEST ENGINE ---
 lgf_coins = 0
 symbol_table = {}
@@ -15,7 +45,10 @@ quests_completed = 0
 current_difficulty = "EASY"
 is_pulling = False 
 
+# THE ULTIMATE BUILT-IN RETRO FONT
 RETRO_FONT = "Fixedsys"
+
+# --- THE SAVE SYSTEM ---
 SAVE_FILE = "lgf_save_data.json"
 
 def load_progress():
@@ -269,14 +302,13 @@ class RedirectText(object):
     def type_char(self):
         if self.queue:
             self.is_typing = True
-            # Tweak these to change the cinematic typing speed
             chunk_size = 4 
             chunk = self.queue[:chunk_size]
             self.queue = self.queue[chunk_size:]
             
             self.output.insert(tk.END, chunk)
             self.output.see(tk.END)
-            self.output.update_idletasks() # Forces Tkinter to redraw instantly
+            self.output.update_idletasks()
             self.output.after(1, self.type_char) 
         else:
             self.is_typing = False
@@ -316,7 +348,7 @@ def execute_code():
     global symbol_table
     symbol_table.clear()
     
-    btn_execute.config(state=tk.DISABLED) # Lock the button to prevent spamming
+    btn_execute.config(state=tk.DISABLED) 
     
     print("\n" + "="*50)
     print("[SYSTEM] INITIATING COMPILER CYCLE...\n")
@@ -333,7 +365,6 @@ def execute_code():
     wait_for_typing(code)
 
 def wait_for_typing(code):
-    """Waits for the Typewriter Engine to finish before checking rewards."""
     if getattr(sys.stdout, 'is_typing', False):
         root.after(50, lambda: wait_for_typing(code))
     else:
@@ -346,6 +377,7 @@ def check_rewards(code):
     
     if "FATAL ERROR" in recent_output:
         print("\n[SYSTEM] Compilation failed. 0 Coins awarded.\n")
+        play_sound('wrong') # AUDIO CUE
         btn_execute.config(state=tk.NORMAL)
         return
 
@@ -389,11 +421,13 @@ def check_rewards(code):
         lgf_coins += reward
         quests_completed += 1
         print(f"\n[QUEST COMPLETE] Target acquired! +{reward} Coins.\n")
+        play_sound('right') # AUDIO CUE
         update_coin_labels()
         save_progress() 
         btn_next.pack(side=tk.LEFT, padx=10)
     else:
         print("\n[SYSTEM] Target ignored. 0 Coins.\n")
+        play_sound('wrong') # AUDIO CUE
         btn_execute.config(state=tk.NORMAL)
 
 def next_quest():
@@ -407,7 +441,7 @@ def next_quest():
 
 # --- THE GACHA ANIMATION SYSTEM ---
 def pull_gacha():
-    global lgf_coins, inventory, is_pulling
+    global lgf_coins, inventory, is_pulling, active_spin_channel
     if is_pulling: return 
     
     loot_pool = list(themes.keys())
@@ -426,6 +460,9 @@ def pull_gacha():
         is_pulling = True
         btn_pull.config(state=tk.DISABLED)
         
+        # Start looping the spin sound seamlessly
+        active_spin_channel = play_sound('spin', loop=-1)
+        
         won_item = random.choices(loot_pool, weights=drop_rates, k=1)[0]
         flashes = 20
         base_delay = 40
@@ -441,9 +478,15 @@ def pull_gacha():
         animate_roll(0) 
     else:
         gacha_result.config(text="[ERROR] Insufficient funds.", fg="#ff4c4c")
+        play_sound('wrong') # Audio Cue for error
 
 def finalize_pull(won_item):
-    global is_pulling, lgf_coins
+    global is_pulling, lgf_coins, active_spin_channel
+    
+    # Kill the spin sound, blast the gacha sound
+    if active_spin_channel:
+        active_spin_channel.stop()
+    play_sound('gacha')
     
     if won_item not in inventory: 
         inventory.append(won_item)
@@ -475,6 +518,7 @@ def equip_item():
         save_progress() 
     else:
         gacha_result.config(text="[WARNING] Select an item from your vault first.", fg="#ff4c4c")
+        play_sound('wrong')
 
 # --- DEV TOOLS ---
 def enable_dev_mode(event=None):
@@ -483,6 +527,7 @@ def enable_dev_mode(event=None):
     update_coin_labels()
     save_progress()
     lbl_menu_dev.config(text="[ DEV FUNDS INJECTED ]", fg="#ffd700")
+    play_sound('gacha')
 
 def disable_dev_mode(event=None):
     global lgf_coins, inventory, equipped_theme
@@ -497,6 +542,7 @@ def disable_dev_mode(event=None):
     save_progress() 
     lbl_menu_dev.config(text="Developer Edition", fg=themes["Default Theme"]["accent"])
     gacha_result.config(text="Account wiped. Awaiting transaction...", fg=themes["Default Theme"]["text"])
+    play_sound('wrong')
 
 def unlock_all_skins(event=None):
     global inventory
@@ -506,14 +552,16 @@ def unlock_all_skins(event=None):
             inventory_listbox.insert(tk.END, theme_name)
     save_progress()
     lbl_menu_dev.config(text="[ ALL SKINS UNLOCKED ]", fg="#ffd700")
+    play_sound('gacha')
 
-# --- THE UI ENGINE  ---
+# --- THE UI ENGINE (3D BLOCKY EDITION) ---
 def apply_theme(theme_name):
     t = themes[theme_name]
     
-    def bind_hover(btn, default_bg, hover_bg):
+    def bind_button_events(btn, default_bg, hover_bg):
         btn.bind("<Enter>", lambda e, b=btn, c=hover_bg: b.configure(bg=c))
         btn.bind("<Leave>", lambda e, b=btn, c=default_bg: b.configure(bg=c))
+        btn.bind("<Button-1>", lambda e: play_sound('click'), add="+") # AUDIO CUE
     
     root.configure(bg=t["bg"])
     for frame in [menu_frame, coding_frame, gacha_frame, cheat_frame, pull_left, codex_container, btn_action_frame]:
@@ -531,27 +579,34 @@ def apply_theme(theme_name):
     
     # --- 3D BUTTONS & HOVERS ---
     btn_menu_arena.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
-    bind_hover(btn_menu_arena, t["accent"], t["hover"])
+    bind_button_events(btn_menu_arena, t["accent"], t["hover"])
+    
     btn_menu_market.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_hover(btn_menu_market, t["panel"], t["accent"])
+    bind_button_events(btn_menu_market, t["panel"], t["accent"])
+    
     btn_menu_codex.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_hover(btn_menu_codex, t["panel"], t["accent"])
+    bind_button_events(btn_menu_codex, t["panel"], t["accent"])
     
     btn_back_arena.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_hover(btn_back_arena, t["panel"], t["accent"])
+    bind_button_events(btn_back_arena, t["panel"], t["accent"])
+    
     btn_execute.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
-    bind_hover(btn_execute, t["accent"], t["hover"])
+    bind_button_events(btn_execute, t["accent"], t["hover"])
+    
     btn_next.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_hover(btn_next, t["panel"], t["accent"])
+    bind_button_events(btn_next, t["panel"], t["accent"])
     
     btn_back_market.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_hover(btn_back_market, t["panel"], t["accent"])
+    bind_button_events(btn_back_market, t["panel"], t["accent"])
+    
     btn_pull.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
-    bind_hover(btn_pull, t["accent"], t["hover"])
+    bind_button_events(btn_pull, t["accent"], t["hover"])
+    
     btn_equip.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
-    bind_hover(btn_equip, t["accent"], t["hover"])
+    bind_button_events(btn_equip, t["accent"], t["hover"])
+    
     btn_back_codex.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_hover(btn_back_codex, t["panel"], t["accent"])
+    bind_button_events(btn_back_codex, t["panel"], t["accent"])
 
     # UI colors
     lbl_quest.configure(bg=t["panel"], fg=t["success"])
@@ -614,6 +669,7 @@ def run_boot_sequence():
     boot_frame.pack(fill=tk.BOTH, expand=True)
     messages = [
         "LGF_OS v3.1.4 [INITIALIZING...]",
+        "LOADING AUDIO MIXER... [OK]",
         "LOADING LEXICAL STATE MACHINE... [OK]",
         "MOUNTING VAULT DATA... [OK]",
         "ESTABLISHING NEURAL LINK... [OK]",
