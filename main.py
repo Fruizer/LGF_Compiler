@@ -25,7 +25,6 @@ def load_sounds():
 load_sounds()
 
 def play_sound(name, loop=0):
-    """Plays a sound and returns the channel so it can be stopped if needed."""
     if name in sounds:
         try:
             return sounds[name].play(loops=loop)
@@ -33,10 +32,11 @@ def play_sound(name, loop=0):
             pass
     return None
 
-active_spin_channel = None # Used to track the looping spin sound
+active_spin_channel = None 
 
 # --- GAME STATE & QUEST ENGINE ---
 lgf_coins = 0
+lgf_exp = 0    # NEW: Experience Points
 symbol_table = {}
 inventory = ["Default Theme"] 
 equipped_theme = "Default Theme"
@@ -45,19 +45,39 @@ quests_completed = 0
 current_difficulty = "EASY"
 is_pulling = False 
 
-# THE ULTIMATE BUILT-IN RETRO FONT
 RETRO_FONT = "Fixedsys"
-
-# --- THE SAVE SYSTEM ---
 SAVE_FILE = "lgf_save_data.json"
 
+# --- RANKING SYSTEM ---
+RANKS = [
+    (0, "Code Freshman"),
+    (500, "Syntax Sophomore"),
+    (1500, "Logic Junior"),
+    (3000, "Senior Engineer"),
+    (6000, "LGF Master"),
+    (10000, "The Gilberto")
+]
+
+def get_rank_info(exp):
+    current_rank = "Code Freshman"
+    next_threshold = 500
+    for i, (threshold, name) in enumerate(RANKS):
+        if exp >= threshold:
+            current_rank = name
+            if i + 1 < len(RANKS):
+                next_threshold = RANKS[i+1][0]
+            else:
+                next_threshold = "MAX"
+    return current_rank, next_threshold
+
 def load_progress():
-    global lgf_coins, inventory, equipped_theme, quests_completed
+    global lgf_coins, lgf_exp, inventory, equipped_theme, quests_completed
     if os.path.exists(SAVE_FILE):
         try:
             with open(SAVE_FILE, "r") as f:
                 data = json.load(f)
                 lgf_coins = data.get("coins", 0)
+                lgf_exp = data.get("exp", 0) # Load EXP
                 inventory = data.get("inventory", ["Default Theme"])
                 equipped_theme = data.get("equipped_theme", "Default Theme")
                 quests_completed = data.get("quests_completed", 0)
@@ -67,6 +87,7 @@ def load_progress():
 def save_progress():
     data = {
         "coins": lgf_coins,
+        "exp": lgf_exp, # Save EXP
         "inventory": inventory,
         "equipped_theme": equipped_theme,
         "quests_completed": quests_completed
@@ -88,16 +109,15 @@ themes = {
     "Crimson Bloodline": {"bg": "#1a0000", "panel": "#330000", "accent": "#ff0000", "hover": "#ff3333", "text": "#ffcccc", "success": "#ff4d4d", "btn_fg": "white"},
     "Synthwave Sunset": {"bg": "#2b0f4c", "panel": "#3d1466", "accent": "#ff9e00", "hover": "#ffb733", "text": "#f706d2", "success": "#ff007f", "btn_fg": "black"},
     "Matrix Glitch": {"bg": "#001100", "panel": "#002200", "accent": "#33ff33", "hover": "#66ff66", "text": "#ccffcc", "success": "#66ff66", "btn_fg": "black"},
-    
     "GAMEBOY CLASSIC": {"bg": "#8bac0f", "panel": "#9bbc0f", "accent": "#0f380f", "hover": "#306230", "text": "#0f380f", "success": "#0f380f", "btn_fg": "white"},
     "RADIANT PROTOCOL": {"bg": "#0f1923", "panel": "#1b2733", "accent": "#ff4655", "hover": "#ff7b87", "text": "#ece8e1", "success": "#00ffcc", "btn_fg": "white"},
     "GILBERTO GREEN": {"bg": "#0a1a0f", "panel": "#112b18", "accent": "#4caf50", "hover": "#66ffa6", "text": "#e8f5e9", "success": "#81c784", "btn_fg": "black"},
-    
     "THE GOLDEN COMPILER": {"bg": "#0B0800", "panel": "#1C1400", "accent": "#FFD700", "hover": "#ffe033", "text": "#FFF2B2", "success": "#FFB300", "btn_fg": "black"},
     "FEU TAMARAWS": {"bg": "#014421", "panel": "#012b15", "accent": "#F2A900", "hover": "#ffbb33", "text": "#ffffff", "success": "#FFD700", "btn_fg": "black"},
     "FEU TECH ACM": {"bg": "#0a050f", "panel": "#140a1f", "accent": "#9d4edd", "hover": "#b366ff", "text": "#e0caff", "success": "#c77dff", "btn_fg": "white"}
 }
 
+# --- MASSIVE QUEST EXPANSION ---
 quest_db = {
     "EASY": [
         {"task": "MISSION: Declare an OUNT (Integer).", "target": "OUNT", "reward": 50},
@@ -105,37 +125,48 @@ quest_db = {
         {"task": "MISSION: Declare a TAMARAW (Bool).", "target": "TAMARAW", "reward": 50},
         {"task": "MISSION: Declare a HERO (Char).", "target": "HERO", "reward": 50},
         {"task": "MISSION: Declare an OUNT equal to 0.", "target": "OUNT_ZERO", "reward": 50},
-        {"task": "MISSION: Declare a TAMARAW as True.", "target": "TAMARAW_TRUE", "reward": 50}
+        {"task": "MISSION: Declare an OUNT equal to 100.", "target": "OUNT_100", "reward": 50},
+        {"task": "MISSION: Declare a TAMARAW as True.", "target": "TAMARAW_TRUE", "reward": 50},
+        {"task": "MISSION: Declare a TAMARAW as False.", "target": "TAMARAW_FALSE", "reward": 50},
+        {"task": "MISSION: Declare a YEARN as \"Hello\".", "target": "YEARN_HELLO", "reward": 60}
     ],
     "MEDIUM": [
         {"task": "MISSION: Print data using RELEASE.", "target": "RELEASE", "reward": 100},
         {"task": "MISSION: Declare TWO different OUNT variables.", "target": "TWO_OUNT", "reward": 100},
         {"task": "MISSION: Declare TWO different YEARN variables.", "target": "TWO_YEARN", "reward": 100},
+        {"task": "MISSION: Declare TWO different HERO variables.", "target": "TWO_HERO", "reward": 100},
+        {"task": "MISSION: Declare TWO different TAMARAW variables.", "target": "TWO_TAMARAW", "reward": 100},
         {"task": "MISSION: Add two numbers.", "target": "MATH_ADD", "reward": 150},
         {"task": "MISSION: Subtract two numbers.", "target": "MATH_SUB", "reward": 150},
-        {"task": "MISSION: Multiply two numbers.", "target": "MATH_MUL", "reward": 150}
+        {"task": "MISSION: Multiply two numbers.", "target": "MATH_MUL", "reward": 150},
+        {"task": "MISSION: Divide two numbers.", "target": "MATH_DIV", "reward": 150}
     ],
     "HARD": [
         {"task": "MISSION: Declare an OUNT, then RELEASE it.", "target": "COMBO_OUNT_RELEASE", "reward": 250},
         {"task": "MISSION: Declare a YEARN, then RELEASE it.", "target": "COMBO_YEARN_RELEASE", "reward": 250},
+        {"task": "MISSION: Declare a HERO, then RELEASE it.", "target": "COMBO_HERO_RELEASE", "reward": 250},
         {"task": "MISSION: Declare a TAMARAW and an OUNT.", "target": "COMBO_TAMARAW_OUNT", "reward": 250},
-        {"task": "MISSION: Declare TWO different HERO variables.", "target": "TWO_HERO", "reward": 250}
+        {"task": "MISSION: Declare a TAMARAW and a YEARN.", "target": "COMBO_TAMARAW_YEARN", "reward": 250},
+        {"task": "MISSION: Add two numbers and RELEASE result.", "target": "MATH_COMBO_ADD", "reward": 300},
+        {"task": "MISSION: Subtract two numbers and RELEASE result.", "target": "MATH_COMBO_SUB", "reward": 300}
     ],
     "EXTREME": [
-        {"task": "MISSION: Multiply two numbers and RELEASE the result.", "target": "MATH_COMBO_MUL", "reward": 500},
-        {"task": "MISSION: Subtract two numbers and RELEASE the result.", "target": "MATH_COMBO_SUB", "reward": 500},
-        {"task": "MISSION: Declare an OUNT, YEARN, and TAMARAW in one run.", "target": "TRI_COMBO", "reward": 800}
+        {"task": "MISSION: Multiply two numbers and RELEASE result.", "target": "MATH_COMBO_MUL", "reward": 500},
+        {"task": "MISSION: Divide two numbers and RELEASE result.", "target": "MATH_COMBO_DIV", "reward": 500},
+        {"task": "MISSION: Declare an OUNT, YEARN, and TAMARAW in one run.", "target": "TRI_COMBO", "reward": 800},
+        {"task": "MISSION: QUAD COMBO! Declare OUNT, YEARN, TAMARAW, & HERO.", "target": "QUAD_COMBO", "reward": 1200},
+        {"task": "MISSION: EXTREME! Declare 3 different variable types AND use RELEASE.", "target": "EXTREME_RELEASE", "reward": 1500}
     ]
 }
 
 def generate_quest():
     global current_difficulty
-    if quests_completed < 3:
+    if quests_completed < 4:
         current_difficulty = "EASY"
-    elif quests_completed < 8:
-        current_difficulty = random.choices(["EASY", "MEDIUM"], weights=[30, 70], k=1)[0]
-    elif quests_completed < 12:
-        current_difficulty = random.choices(["MEDIUM", "HARD"], weights=[40, 60], k=1)[0]
+    elif quests_completed < 10:
+        current_difficulty = random.choices(["EASY", "MEDIUM"], weights=[20, 80], k=1)[0]
+    elif quests_completed < 15:
+        current_difficulty = random.choices(["MEDIUM", "HARD"], weights=[30, 70], k=1)[0]
     else:
         current_difficulty = random.choices(["HARD", "EXTREME"], weights=[40, 60], k=1)[0]
         
@@ -371,63 +402,110 @@ def wait_for_typing(code):
         check_rewards(code)
 
 def check_rewards(code):
-    global lgf_coins, quests_completed
+    global lgf_coins, lgf_exp, quests_completed
     output_text = console_output.get("1.0", tk.END)
     recent_output = output_text.split("[SYSTEM] INITIATING COMPILER CYCLE...")[-1]
     
     if "FATAL ERROR" in recent_output:
-        print("\n[SYSTEM] Compilation failed. 0 Coins awarded.\n")
-        play_sound('wrong') # AUDIO CUE
+        print("\n[SYSTEM] Compilation failed. 0 EXP / 0 Coins awarded.\n")
+        play_sound('wrong') 
         btn_execute.config(state=tk.NORMAL)
         return
 
     quest_passed = False
+    target = active_quest["target"]
     
-    if active_quest["target"] in ["OUNT", "YEARN", "TAMARAW", "HERO"]:
-        if any(data["type"] == active_quest["target"] for data in symbol_table.values()): quest_passed = True
-    elif active_quest["target"] == "OUNT_ZERO":
+    # Simple Target Validations
+    if target in ["OUNT", "YEARN", "TAMARAW", "HERO"]:
+        if any(data["type"] == target for data in symbol_table.values()): quest_passed = True
+    elif target == "OUNT_ZERO":
         if any(data["type"] == "OUNT" and int(data["value"]) == 0 for data in symbol_table.values()): quest_passed = True
-    elif active_quest["target"] == "TAMARAW_TRUE":
+    elif target == "OUNT_100":
+        if any(data["type"] == "OUNT" and int(data["value"]) == 100 for data in symbol_table.values()): quest_passed = True
+    elif target == "TAMARAW_TRUE":
         if any(data["type"] == "TAMARAW" and str(data["value"]) == "True" for data in symbol_table.values()): quest_passed = True
-    elif active_quest["target"] == "RELEASE":
+    elif target == "TAMARAW_FALSE":
+        if any(data["type"] == "TAMARAW" and str(data["value"]) == "False" for data in symbol_table.values()): quest_passed = True
+    elif target == "YEARN_HELLO":
+        if any(data["type"] == "YEARN" and str(data["value"]).strip('"') == "Hello" for data in symbol_table.values()): quest_passed = True
+    elif target == "RELEASE":
         if "RELEASE" in code: quest_passed = True
-    elif active_quest["target"] == "TWO_OUNT":
+    
+    # Medium Double Targets
+    elif target == "TWO_OUNT":
         if sum(1 for data in symbol_table.values() if data["type"] == "OUNT") >= 2: quest_passed = True
-    elif active_quest["target"] == "TWO_YEARN":
+    elif target == "TWO_YEARN":
         if sum(1 for data in symbol_table.values() if data["type"] == "YEARN") >= 2: quest_passed = True
-    elif active_quest["target"] == "TWO_HERO":
+    elif target == "TWO_HERO":
         if sum(1 for data in symbol_table.values() if data["type"] == "HERO") >= 2: quest_passed = True
-    elif active_quest["target"] == "COMBO_OUNT_RELEASE":
+    elif target == "TWO_TAMARAW":
+        if sum(1 for data in symbol_table.values() if data["type"] == "TAMARAW") >= 2: quest_passed = True
+    
+    # Hard Combo Targets
+    elif target == "COMBO_OUNT_RELEASE":
         if any(data["type"] == "OUNT" for data in symbol_table.values()) and "RELEASE" in code: quest_passed = True
-    elif active_quest["target"] == "COMBO_YEARN_RELEASE":
+    elif target == "COMBO_YEARN_RELEASE":
         if any(data["type"] == "YEARN" for data in symbol_table.values()) and "RELEASE" in code: quest_passed = True
-    elif active_quest["target"] == "COMBO_TAMARAW_OUNT":
+    elif target == "COMBO_HERO_RELEASE":
+        if any(data["type"] == "HERO" for data in symbol_table.values()) and "RELEASE" in code: quest_passed = True
+    elif target == "COMBO_TAMARAW_OUNT":
         if any(data["type"] == "TAMARAW" for data in symbol_table.values()) and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
-    elif active_quest["target"] == "TRI_COMBO":
-        if any(d["type"] == "OUNT" for d in symbol_table.values()) and any(d["type"] == "YEARN" for d in symbol_table.values()) and any(d["type"] == "TAMARAW" for d in symbol_table.values()): quest_passed = True
-    elif active_quest["target"] == "MATH_ADD":
+    elif target == "COMBO_TAMARAW_YEARN":
+        if any(data["type"] == "TAMARAW" for data in symbol_table.values()) and any(data["type"] == "YEARN" for data in symbol_table.values()): quest_passed = True
+    
+    # Math Validations
+    elif target == "MATH_ADD":
         if "+" in code and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
-    elif active_quest["target"] == "MATH_SUB":
+    elif target == "MATH_SUB":
         if "-" in code and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
-    elif active_quest["target"] == "MATH_MUL":
+    elif target == "MATH_MUL":
         if "*" in code and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
-    elif active_quest["target"] == "MATH_COMBO_MUL":
-        if "*" in code and "RELEASE" in code: quest_passed = True
-    elif active_quest["target"] == "MATH_COMBO_SUB":
+    elif target == "MATH_DIV":
+        if "/" in code and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
+    
+    # Extreme Combos
+    elif target == "MATH_COMBO_ADD":
+        if "+" in code and "RELEASE" in code: quest_passed = True
+    elif target == "MATH_COMBO_SUB":
         if "-" in code and "RELEASE" in code: quest_passed = True
+    elif target == "MATH_COMBO_MUL":
+        if "*" in code and "RELEASE" in code: quest_passed = True
+    elif target == "MATH_COMBO_DIV":
+        if "/" in code and "RELEASE" in code: quest_passed = True
+    elif target == "TRI_COMBO":
+        if any(d["type"] == "OUNT" for d in symbol_table.values()) and any(d["type"] == "YEARN" for d in symbol_table.values()) and any(d["type"] == "TAMARAW" for d in symbol_table.values()): quest_passed = True
+    elif target == "QUAD_COMBO":
+        if any(d["type"] == "OUNT" for d in symbol_table.values()) and any(d["type"] == "YEARN" for d in symbol_table.values()) and any(d["type"] == "TAMARAW" for d in symbol_table.values()) and any(d["type"] == "HERO" for d in symbol_table.values()): quest_passed = True
+    elif target == "EXTREME_RELEASE":
+        types = set(d["type"] for d in symbol_table.values())
+        if len(types) >= 3 and "RELEASE" in code: quest_passed = True
 
     if quest_passed:
         reward = active_quest["reward"]
+        
+        # Rank logic evaluation
+        old_rank, _ = get_rank_info(lgf_exp)
+        lgf_exp += reward
         lgf_coins += reward
         quests_completed += 1
-        print(f"\n[QUEST COMPLETE] Target acquired! +{reward} Coins.\n")
-        play_sound('right') # AUDIO CUE
-        update_coin_labels()
+        new_rank, _ = get_rank_info(lgf_exp)
+        
+        print(f"\n[QUEST COMPLETE] Target acquired! +{reward} EXP / +{reward} Coins.\n")
+        
+        if new_rank != old_rank:
+            print("*"*50)
+            print(f"[PROMOTION] YOU HAVE RANKED UP TO: {new_rank.upper()}!!!")
+            print("*"*50 + "\n")
+            play_sound('gacha') # Epic sound for rank up
+        else:
+            play_sound('right') 
+            
+        update_stats_labels()
         save_progress() 
         btn_next.pack(side=tk.LEFT, padx=10)
     else:
-        print("\n[SYSTEM] Target ignored. 0 Coins.\n")
-        play_sound('wrong') # AUDIO CUE
+        print("\n[SYSTEM] Target ignored. 0 EXP / 0 Coins.\n")
+        play_sound('wrong') 
         btn_execute.config(state=tk.NORMAL)
 
 def next_quest():
@@ -435,6 +513,7 @@ def next_quest():
     active_quest = generate_quest()
     lbl_quest.config(text=active_quest["task"]) 
     code_input.delete("1.0", tk.END)
+    console_output.delete("1.0", tk.END) 
     highlight_syntax()
     btn_next.pack_forget()
     btn_execute.config(state=tk.NORMAL)
@@ -455,12 +534,11 @@ def pull_gacha():
     
     if lgf_coins >= 100:
         lgf_coins -= 100
-        update_coin_labels()
+        update_stats_labels()
         save_progress()
         is_pulling = True
         btn_pull.config(state=tk.DISABLED)
         
-        # Start looping the spin sound seamlessly
         active_spin_channel = play_sound('spin', loop=-1)
         
         won_item = random.choices(loot_pool, weights=drop_rates, k=1)[0]
@@ -478,12 +556,11 @@ def pull_gacha():
         animate_roll(0) 
     else:
         gacha_result.config(text="[ERROR] Insufficient funds.", fg="#ff4c4c")
-        play_sound('wrong') # Audio Cue for error
+        play_sound('wrong') 
 
 def finalize_pull(won_item):
     global is_pulling, lgf_coins, active_spin_channel
     
-    # Kill the spin sound, blast the gacha sound
     if active_spin_channel:
         active_spin_channel.stop()
     play_sound('gacha')
@@ -501,7 +578,7 @@ def finalize_pull(won_item):
         lgf_coins += 25
         gacha_result.config(text=f"[DUPLICATE] Pulled {won_item}. Refunded 25 Coins.", fg="#888888")
         
-    update_coin_labels()
+    update_stats_labels()
     save_progress() 
     is_pulling = False
     btn_pull.config(state=tk.NORMAL)
@@ -522,23 +599,25 @@ def equip_item():
 
 # --- DEV TOOLS ---
 def enable_dev_mode(event=None):
-    global lgf_coins
+    global lgf_coins, lgf_exp
     lgf_coins += 99999
-    update_coin_labels()
+    lgf_exp += 99999
+    update_stats_labels()
     save_progress()
-    lbl_menu_dev.config(text="[ DEV FUNDS INJECTED ]", fg="#ffd700")
+    lbl_menu_dev.config(text="[ GOD MODE ACTIVATED ]", fg="#ffd700")
     play_sound('gacha')
 
 def disable_dev_mode(event=None):
-    global lgf_coins, inventory, equipped_theme
+    global lgf_coins, lgf_exp, inventory, equipped_theme
     lgf_coins = 0
+    lgf_exp = 0
     inventory = ["Default Theme"]
     inventory_listbox.delete(0, tk.END)
     inventory_listbox.insert(tk.END, "Default Theme")
     equipped_theme = "Default Theme"
     lbl_equipped.config(text=f"Equipped: [{equipped_theme}]")
     apply_theme("Default Theme")
-    update_coin_labels()
+    update_stats_labels()
     save_progress() 
     lbl_menu_dev.config(text="Developer Edition", fg=themes["Default Theme"]["accent"])
     gacha_result.config(text="Account wiped. Awaiting transaction...", fg=themes["Default Theme"]["text"])
@@ -561,7 +640,7 @@ def apply_theme(theme_name):
     def bind_button_events(btn, default_bg, hover_bg):
         btn.bind("<Enter>", lambda e, b=btn, c=hover_bg: b.configure(bg=c))
         btn.bind("<Leave>", lambda e, b=btn, c=default_bg: b.configure(bg=c))
-        btn.bind("<Button-1>", lambda e: play_sound('click'), add="+") # AUDIO CUE
+        btn.bind("<Button-1>", lambda e: play_sound('click'), add="+") 
     
     root.configure(bg=t["bg"])
     for frame in [menu_frame, coding_frame, gacha_frame, cheat_frame, pull_left, codex_container, btn_action_frame]:
@@ -571,40 +650,38 @@ def apply_theme(theme_name):
         frame.configure(bg=t["panel"], highlightbackground=t["accent"], highlightcolor=t["accent"])
         
     lbl_menu_title.configure(bg=t["bg"], fg=t["text"])
+    
     if lbl_menu_dev.cget("text") not in ["[ GOD MODE ACTIVATED ]", "[ DEV FUNDS INJECTED ]", "[ ALL SKINS UNLOCKED ]"]:
         lbl_menu_dev.configure(bg=t["bg"], fg=t["accent"])
     else:
         lbl_menu_dev.configure(bg=t["bg"]) 
+        
+    # Stats colors
+    lbl_menu_rank.configure(bg=t["bg"], fg=t["accent"])
+    lbl_menu_exp.configure(bg=t["bg"], fg=t["success"])
     lbl_menu_coins.configure(bg=t["bg"], fg=t["success"])
     
     # --- 3D BUTTONS & HOVERS ---
     btn_menu_arena.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
     bind_button_events(btn_menu_arena, t["accent"], t["hover"])
-    
     btn_menu_market.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
     bind_button_events(btn_menu_market, t["panel"], t["accent"])
-    
     btn_menu_codex.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
     bind_button_events(btn_menu_codex, t["panel"], t["accent"])
     
     btn_back_arena.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
     bind_button_events(btn_back_arena, t["panel"], t["accent"])
-    
     btn_execute.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
     bind_button_events(btn_execute, t["accent"], t["hover"])
-    
     btn_next.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
     bind_button_events(btn_next, t["panel"], t["accent"])
     
     btn_back_market.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
     bind_button_events(btn_back_market, t["panel"], t["accent"])
-    
     btn_pull.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
     bind_button_events(btn_pull, t["accent"], t["hover"])
-    
     btn_equip.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
     bind_button_events(btn_equip, t["accent"], t["hover"])
-    
     btn_back_codex.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
     bind_button_events(btn_back_codex, t["panel"], t["accent"])
 
@@ -643,7 +720,16 @@ def show_frame(frame_to_show):
     cheat_frame.pack_forget()
     frame_to_show.pack(fill=tk.BOTH, expand=True)
 
-def update_coin_labels():
+def update_stats_labels():
+    current_rank, next_threshold = get_rank_info(lgf_exp)
+    
+    lbl_menu_rank.config(text=f"[{current_rank}]")
+    
+    if next_threshold == "MAX":
+        lbl_menu_exp.config(text=f"[EXP]: {lgf_exp} (MAX RANK)")
+    else:
+        lbl_menu_exp.config(text=f"[EXP]: {lgf_exp} / {next_threshold}")
+        
     lbl_menu_coins.config(text=f"[VAULT]: {lgf_coins} Coins")
     lbl_gacha_coins.config(text=f"[VAULT]: {lgf_coins} Coins")
 
@@ -693,13 +779,20 @@ def run_boot_sequence():
 # SCREEN 1: MAIN MENU
 # ==========================================
 lbl_menu_title = tk.Label(menu_frame, text="LGF COMPILER", font=(RETRO_FONT, 54, "bold"))
-lbl_menu_title.pack(pady=(100, 10))
+lbl_menu_title.pack(pady=(80, 10))
 
 lbl_menu_dev = tk.Label(menu_frame, text="Developer Edition", font=(RETRO_FONT, 17, "italic"))
-lbl_menu_dev.pack(pady=(0, 40))
+lbl_menu_dev.pack(pady=(0, 20))
+
+# --- RANK & EXP DISPLAY ---
+lbl_menu_rank = tk.Label(menu_frame, text="[Rank Loading...]", font=(RETRO_FONT, 24, "bold"))
+lbl_menu_rank.pack(pady=(0, 5))
+
+lbl_menu_exp = tk.Label(menu_frame, text="[EXP Loading...]", font=(RETRO_FONT, 16))
+lbl_menu_exp.pack(pady=(0, 20))
 
 lbl_menu_coins = tk.Label(menu_frame, text=f"[VAULT]: {lgf_coins} Coins", font=(RETRO_FONT, 20, "bold"))
-lbl_menu_coins.pack(pady=10)
+lbl_menu_coins.pack(pady=(0, 20))
 
 btn_menu_arena = tk.Button(menu_frame, text="ENTER ARENA", font=(RETRO_FONT, 17, "bold"), width=22, pady=3, bd=5, relief=tk.RAISED, command=lambda: show_frame(coding_frame))
 btn_menu_arena.pack(pady=10)
@@ -827,6 +920,7 @@ lbl_syntax_text = tk.Label(syntax_card, text=syntax_text, font=(RETRO_FONT, 20),
 lbl_syntax_text.pack(anchor="w", padx=30, pady=10)
 
 # --- STARTUP ---
+update_stats_labels() # Initializes the rank on screen
 apply_theme(equipped_theme) 
 run_boot_sequence() 
 
