@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, Toplevel, Canvas
 import sys
 import random
 import json
@@ -36,10 +36,11 @@ active_spin_channel = None
 
 # --- GAME STATE & QUEST ENGINE ---
 lgf_coins = 0
-lgf_exp = 0    # NEW: Experience Points
+lgf_exp = 0    
 symbol_table = {}
 inventory = ["Default Theme"] 
 equipped_theme = "Default Theme"
+latest_ast = None # NEW: Holds the visual logic tree data
 
 quests_completed = 0
 current_difficulty = "EASY"
@@ -77,7 +78,7 @@ def load_progress():
             with open(SAVE_FILE, "r") as f:
                 data = json.load(f)
                 lgf_coins = data.get("coins", 0)
-                lgf_exp = data.get("exp", 0) # Load EXP
+                lgf_exp = data.get("exp", 0) 
                 inventory = data.get("inventory", ["Default Theme"])
                 equipped_theme = data.get("equipped_theme", "Default Theme")
                 quests_completed = data.get("quests_completed", 0)
@@ -87,7 +88,7 @@ def load_progress():
 def save_progress():
     data = {
         "coins": lgf_coins,
-        "exp": lgf_exp, # Save EXP
+        "exp": lgf_exp, 
         "inventory": inventory,
         "equipped_theme": equipped_theme,
         "quests_completed": quests_completed
@@ -117,45 +118,29 @@ themes = {
     "FEU TECH ACM": {"bg": "#0a050f", "panel": "#140a1f", "accent": "#9d4edd", "hover": "#b366ff", "text": "#e0caff", "success": "#c77dff", "btn_fg": "white"}
 }
 
-# --- MASSIVE QUEST EXPANSION ---
 quest_db = {
     "EASY": [
         {"task": "MISSION: Declare an OUNT (Integer).", "target": "OUNT", "reward": 50},
         {"task": "MISSION: Declare a YEARN (String).", "target": "YEARN", "reward": 50},
         {"task": "MISSION: Declare a TAMARAW (Bool).", "target": "TAMARAW", "reward": 50},
         {"task": "MISSION: Declare a HERO (Char).", "target": "HERO", "reward": 50},
-        {"task": "MISSION: Declare an OUNT equal to 0.", "target": "OUNT_ZERO", "reward": 50},
-        {"task": "MISSION: Declare an OUNT equal to 100.", "target": "OUNT_100", "reward": 50},
-        {"task": "MISSION: Declare a TAMARAW as True.", "target": "TAMARAW_TRUE", "reward": 50},
-        {"task": "MISSION: Declare a TAMARAW as False.", "target": "TAMARAW_FALSE", "reward": 50},
-        {"task": "MISSION: Declare a YEARN as \"Hello\".", "target": "YEARN_HELLO", "reward": 60}
+        {"task": "MISSION: Declare an OUNT equal to 0.", "target": "OUNT_ZERO", "reward": 50}
     ],
     "MEDIUM": [
         {"task": "MISSION: Print data using RELEASE.", "target": "RELEASE", "reward": 100},
         {"task": "MISSION: Declare TWO different OUNT variables.", "target": "TWO_OUNT", "reward": 100},
-        {"task": "MISSION: Declare TWO different YEARN variables.", "target": "TWO_YEARN", "reward": 100},
-        {"task": "MISSION: Declare TWO different HERO variables.", "target": "TWO_HERO", "reward": 100},
-        {"task": "MISSION: Declare TWO different TAMARAW variables.", "target": "TWO_TAMARAW", "reward": 100},
         {"task": "MISSION: Add two numbers.", "target": "MATH_ADD", "reward": 150},
-        {"task": "MISSION: Subtract two numbers.", "target": "MATH_SUB", "reward": 150},
-        {"task": "MISSION: Multiply two numbers.", "target": "MATH_MUL", "reward": 150},
-        {"task": "MISSION: Divide two numbers.", "target": "MATH_DIV", "reward": 150}
+        {"task": "MISSION: Subtract two numbers.", "target": "MATH_SUB", "reward": 150}
     ],
     "HARD": [
         {"task": "MISSION: Declare an OUNT, then RELEASE it.", "target": "COMBO_OUNT_RELEASE", "reward": 250},
-        {"task": "MISSION: Declare a YEARN, then RELEASE it.", "target": "COMBO_YEARN_RELEASE", "reward": 250},
-        {"task": "MISSION: Declare a HERO, then RELEASE it.", "target": "COMBO_HERO_RELEASE", "reward": 250},
         {"task": "MISSION: Declare a TAMARAW and an OUNT.", "target": "COMBO_TAMARAW_OUNT", "reward": 250},
-        {"task": "MISSION: Declare a TAMARAW and a YEARN.", "target": "COMBO_TAMARAW_YEARN", "reward": 250},
-        {"task": "MISSION: Add two numbers and RELEASE result.", "target": "MATH_COMBO_ADD", "reward": 300},
-        {"task": "MISSION: Subtract two numbers and RELEASE result.", "target": "MATH_COMBO_SUB", "reward": 300}
+        {"task": "MISSION: Add two numbers and RELEASE result.", "target": "MATH_COMBO_ADD", "reward": 300}
     ],
     "EXTREME": [
         {"task": "MISSION: Multiply two numbers and RELEASE result.", "target": "MATH_COMBO_MUL", "reward": 500},
-        {"task": "MISSION: Divide two numbers and RELEASE result.", "target": "MATH_COMBO_DIV", "reward": 500},
-        {"task": "MISSION: Declare an OUNT, YEARN, and TAMARAW in one run.", "target": "TRI_COMBO", "reward": 800},
-        {"task": "MISSION: QUAD COMBO! Declare OUNT, YEARN, TAMARAW, & HERO.", "target": "QUAD_COMBO", "reward": 1200},
-        {"task": "MISSION: EXTREME! Declare 3 different variable types AND use RELEASE.", "target": "EXTREME_RELEASE", "reward": 1500}
+        {"task": "MISSION: TRI COMBO! Declare OUNT, YEARN, TAMARAW.", "target": "TRI_COMBO", "reward": 800},
+        {"task": "MISSION: EXTREME! Declare 3 variable types AND use RELEASE.", "target": "EXTREME_RELEASE", "reward": 1500}
     ]
 }
 
@@ -175,57 +160,46 @@ def generate_quest():
 
 active_quest = generate_quest()
 
-# --- THE VERBOSE COMPILER ENGINE ---
+# --- THE VERBOSE COMPILER ENGINE WITH AST GENERATION ---
 def lgf_compiler(source_code):
+    global latest_ast
     print(f"Input Code: {source_code}\n")
     cleaned_code = source_code.replace(":>", " :> ").replace(",", " , ")
     cleaned_code = cleaned_code.replace("+", " + ").replace("-", " - ").replace("*", " * ").replace("/", " / ")
     words = cleaned_code.split()
-    if not words: return
+    if not words: return False
 
     print("--- STARTING LEXICAL ANALYSIS ---")
     tokens = []
     for word in words:
         if word in ["OUNT", "HERO", "TAMARAW", "YEARN"]: 
             tokens.append(("DATATYPE", word))
-            print(f"[LEXER] Found '{word}' -> Identified as DATATYPE")
         elif word == "IS": 
             tokens.append(("ASSIGN", word))
-            print(f"[LEXER] Found '{word}' -> Identified as ASSIGN OPERATOR")
         elif word == ":>": 
             tokens.append(("DELIMITER", word))
-            print(f"[LEXER] Found '{word}' -> Identified as DELIMITER")
         elif word == "RELEASE": 
             tokens.append(("OUTPUT_CMD", word))
-            print(f"[LEXER] Found '{word}' -> Identified as OUTPUT_CMD")
         elif word == "EndThat": 
             tokens.append(("NEWLINE", word))
-            print(f"[LEXER] Found '{word}' -> Identified as NEWLINE")
         elif word == ",": 
             tokens.append(("COMMA", word))
-            print(f"[LEXER] Found '{word}' -> Identified as COMMA")
         elif word in ["+", "-", "*", "/"]: 
             tokens.append(("MATH_OP", word))
-            print(f"[LEXER] Found '{word}' -> Identified as MATH_OP")
         elif word.isdigit(): 
             tokens.append(("LITERAL_INT", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_INT")
         elif word.startswith('"') and word.endswith('"'): 
             tokens.append(("LITERAL_STRING", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_STRING")
         elif word.startswith("'") and word.endswith("'") and len(word) == 3: 
             tokens.append(("LITERAL_CHAR", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_CHAR")
         elif word in ["True", "False"]: 
             tokens.append(("LITERAL_BOOL", word))
-            print(f"[LEXER] Found '{word}' -> Identified as LITERAL_BOOL")
         else: 
             tokens.append(("IDENTIFIER", word))
-            print(f"[LEXER] Found '{word}' -> Identified as IDENTIFIER")
+        print(f"[LEXER] Found '{word}' -> {tokens[-1][0]}")
     print("Lexical Analysis Complete.\n")
 
     print("--- STARTING SYNTAX ANALYSIS ---")
-    print("[PARSER] Checking statement structure...")
     is_assignment = False
     is_math_assignment = False
     is_release = False
@@ -233,90 +207,137 @@ def lgf_compiler(source_code):
     if tokens[0][0] == "DATATYPE":
         if len(tokens) == 5 and (tokens[1][0] == "IDENTIFIER" and tokens[2][0] == "ASSIGN" and tokens[3][0].startswith("LITERAL") and tokens[4][0] == "DELIMITER"):
             is_assignment = True
-            print("[PARSER] Expected rule: [DATATYPE] [IDENTIFIER] [ASSIGN] [LITERAL] [DELIMITER]")
-            print("[PARSER] Actual structure matches expected rule perfectly.")
-            print("Syntax Analysis Complete. No structural errors.\n")
+            print("[PARSER] Syntax Valid: Standard Assignment")
         elif len(tokens) == 7 and (tokens[1][0] == "IDENTIFIER" and tokens[2][0] == "ASSIGN" and tokens[4][0] == "MATH_OP" and tokens[6][0] == "DELIMITER"):
             is_math_assignment = True
-            print("[PARSER] Expected rule: [DATATYPE] [IDENTIFIER] [ASSIGN] [LITERAL] [MATH_OP] [LITERAL] [DELIMITER]")
-            print("[PARSER] Actual structure matches expected rule perfectly.")
-            print("Syntax Analysis Complete. No structural errors.\n")
+            print("[PARSER] Syntax Valid: Math Assignment")
         else:
-            print("[PARSER] FATAL ERROR: Syntax invalid. Structure does not match known rules.")
-            return
+            print("[PARSER] FATAL ERROR: Syntax invalid.")
+            return False
     elif tokens[0][0] == "OUTPUT_CMD":
         is_release = True
         if tokens[-1][0] != "DELIMITER":
             print("[PARSER] FATAL ERROR: Missing delimiter ':>'.")
-            return
-        print("[PARSER] Expected rule: RELEASE [Identifier/Literal], EndThat :> (or similar)")
-        print("[PARSER] Structure accepted for RELEASE command.")
-        print("Syntax Analysis Complete. No structural errors.\n")
+            return False
+        print("[PARSER] Syntax Valid: Release Command")
     else:
-        print("[PARSER] FATAL ERROR: Unknown statement structure.")
-        return
+        print("[PARSER] FATAL ERROR: Unknown statement.")
+        return False
 
     print("--- STARTING SEMANTIC ANALYSIS ---")
     if is_assignment:
-        print("[SEMANTICS] Checking Type Compatibility...")
         var_type, var_name, var_value, literal_type = tokens[0][1], tokens[1][1], tokens[3][1], tokens[3][0]
-        print(f"[SEMANTICS] Variable '{var_name}' is declared as '{var_type}'. Value is '{var_value}'.")
-        
         is_valid_type = (var_type == "OUNT" and literal_type == "LITERAL_INT") or \
                         (var_type == "YEARN" and literal_type == "LITERAL_STRING") or \
                         (var_type == "HERO" and literal_type == "LITERAL_CHAR") or \
                         (var_type == "TAMARAW" and literal_type == "LITERAL_BOOL")
 
         if is_valid_type:
-            print("[SEMANTICS] Types match. No coercion needed.")
             symbol_table[var_name] = {"type": var_type, "value": var_value}
-            print(f"[SEMANTICS] Binding variable '{var_name}' to Symbol Table.")
-            print("Semantic Analysis Complete.\n")
+            print(f"[SEMANTICS] Bound '{var_name}' to Symbol Table.")
+            # Construct AST
+            latest_ast = {"name": "ASSIGN (IS)", "left": {"name": f"VAR: {var_name}\n({var_type})"}, "right": {"name": f"VAL:\n{var_value}"}}
         else:
-            print(f"[SEMANTICS] FATAL ERROR: Type mismatch. Cannot coerce {literal_type} into {var_type}.")
+            print(f"[SEMANTICS] FATAL ERROR: Type mismatch.")
+            return False
             
     elif is_math_assignment:
-        print("[SEMANTICS] Checking Operation Validity...")
         var_type, var_name = tokens[0][1], tokens[1][1]
         val1, operator, val2 = tokens[3][1], tokens[4][1], tokens[5][1]
-        print(f"[SEMANTICS] Variable '{var_name}' declared as '{var_type}'. Operation: {val1} {operator} {val2}")
-        
         if var_type != "OUNT":
-            print("[SEMANTICS] FATAL ERROR: Math operations are only allowed for OUNT types.")
-            return
+            print("[SEMANTICS] FATAL ERROR: Math only allowed for OUNT.")
+            return False
         try:
             if operator == "+": result = int(val1) + int(val2)
             elif operator == "-": result = int(val1) - int(val2)
             elif operator == "*": result = int(val1) * int(val2)
             elif operator == "/": result = int(val1) // int(val2)
-            
-            print("[SEMANTICS] Operation successful.")
             symbol_table[var_name] = {"type": "OUNT", "value": result}
-            print(f"[SEMANTICS] Binding variable '{var_name}' (Value: {result}) to Symbol Table.")
-            print("Semantic Analysis Complete.\n")
+            print(f"[SEMANTICS] Bound '{var_name}' = {result}.")
+            # Construct AST
+            latest_ast = {
+                "name": "ASSIGN (IS)", 
+                "left": {"name": f"VAR: {var_name}\n({var_type})"}, 
+                "right": {
+                    "name": f"OP: {operator}", 
+                    "left": {"name": f"VAL:\n{val1}"}, 
+                    "right": {"name": f"VAL:\n{val2}"}
+                }
+            }
         except Exception:
-            print("[SEMANTICS] FATAL ERROR: Invalid math operation.")
+            print("[SEMANTICS] FATAL ERROR: Invalid math.")
+            return False
             
     elif is_release:
-        print("[SEMANTICS] Executing Output Command...")
         output_string = ""
+        ast_children = []
         for i in range(1, len(tokens) - 1):
             tok_type, tok_val = tokens[i]
             if tok_type == "IDENTIFIER":
                 if tok_val in symbol_table:
                     output_string += str(symbol_table[tok_val]["value"]).replace('"', '').replace("'", "")
+                    ast_children.append({"name": f"VAR REF:\n{tok_val}"})
                 else:
-                    print(f"[SEMANTICS] FATAL ERROR: Variable '{tok_val}' is not defined!")
-                    return
+                    print(f"[SEMANTICS] FATAL ERROR: '{tok_val}' not defined!")
+                    return False
             elif tok_type.startswith("LITERAL"):
                 output_string += str(tok_val).replace('"', '').replace("'", "")
             elif tok_type == "NEWLINE":
                 output_string += "\n"
-        
+                ast_children.append({"name": f"CMD:\nEndThat"})
         print("\n=== PROGRAM OUTPUT ===")
         print(output_string)
         print("======================\n")
-        print("Semantic Analysis Complete.\n")
+        
+        # Construct AST for Output
+        if len(ast_children) == 1:
+            latest_ast = {"name": "OUTPUT (RELEASE)", "left": ast_children[0]}
+        elif len(ast_children) > 1:
+            latest_ast = {"name": "OUTPUT (RELEASE)", "left": ast_children[0], "right": ast_children[1]}
+        else:
+            latest_ast = {"name": "OUTPUT (RELEASE)", "left": {"name": "EMPTY"}}
+
+    return True
+
+# --- AST VISUALIZER MODAL ---
+def draw_ast_node(canvas, node, x, y, x_offset, t):
+    box_width, box_height = 100, 60
+    
+    # Draw connections first so they go behind nodes
+    if "left" in node:
+        canvas.create_line(x, y + box_height/2, x - x_offset, y + 100, fill=t["accent"], width=3, arrow=tk.LAST)
+        draw_ast_node(canvas, node["left"], x - x_offset, y + 100, x_offset / 1.5, t)
+    if "right" in node:
+        canvas.create_line(x, y + box_height/2, x + x_offset, y + 100, fill=t["accent"], width=3, arrow=tk.LAST)
+        draw_ast_node(canvas, node["right"], x + x_offset, y + 100, x_offset / 1.5, t)
+        
+    # Draw actual node
+    canvas.create_rectangle(x - box_width/2, y - box_height/2, x + box_width/2, y + box_height/2, 
+                            fill=t["panel"], outline=t["success"], width=3)
+    canvas.create_text(x, y, text=node["name"], fill=t["text"], font=(RETRO_FONT, 14, "bold"), justify="center")
+
+def show_ast_visualizer():
+    global latest_ast
+    if not latest_ast:
+        print("[SYSTEM] No AST available. Compile a valid script first.")
+        return
+        
+    play_sound('click')
+    t = themes[equipped_theme]
+    
+    ast_window = Toplevel(root)
+    ast_window.title("LGF OS - Abstract Syntax Tree")
+    ast_window.geometry("800x600")
+    ast_window.configure(bg=t["bg"])
+    
+    lbl_title = tk.Label(ast_window, text="LOGIC GRAPH GENERATED", font=(RETRO_FONT, 24, "bold"), bg=t["bg"], fg=t["success"])
+    lbl_title.pack(pady=20)
+    
+    canvas = Canvas(ast_window, bg=t["bg"], highlightthickness=0)
+    canvas.pack(fill=tk.BOTH, expand=True)
+    
+    # Start drawing from top center
+    draw_ast_node(canvas, latest_ast, 400, 80, 200, t)
 
 # --- THE SMOOTH TYPEWRITER ENGINE ---
 class RedirectText(object):
@@ -351,12 +372,10 @@ def highlight_syntax(event=None):
         code_input.tag_remove(tag, "1.0", tk.END)
         
     t = themes[equipped_theme]
-    
     code_input.tag_config("keyword", foreground=t["accent"], font=(RETRO_FONT, 22, "bold"))
     code_input.tag_config("string", foreground=t["success"])
     
     keywords = ["OUNT", "YEARN", "TAMARAW", "HERO", "RELEASE", "EndThat", "IS"]
-    
     for word in keywords:
         start = "1.0"
         while True:
@@ -376,10 +395,11 @@ def highlight_syntax(event=None):
         start = end
 
 def execute_code():
-    global symbol_table
+    global symbol_table, latest_ast
     symbol_table.clear()
-    
+    latest_ast = None
     btn_execute.config(state=tk.DISABLED) 
+    btn_view_ast.pack_forget() # Hide AST button until success
     
     print("\n" + "="*50)
     print("[SYSTEM] INITIATING COMPILER CYCLE...\n")
@@ -387,103 +407,65 @@ def execute_code():
     code = code_input.get("1.0", tk.END).strip()
     if not code:
         print("[SYSTEM] The editor is empty.\n")
-        root.after(100, lambda: wait_for_typing(code))
+        root.after(100, lambda: wait_for_typing(code, False))
         return
 
     lines = [line.strip() for line in code.split('\n') if line.strip()]
-    for line in lines: lgf_compiler(line)
+    success = True
+    for line in lines: 
+        if not lgf_compiler(line): success = False
     
-    wait_for_typing(code)
+    wait_for_typing(code, success)
 
-def wait_for_typing(code):
+def wait_for_typing(code, success):
     if getattr(sys.stdout, 'is_typing', False):
-        root.after(50, lambda: wait_for_typing(code))
+        root.after(50, lambda: wait_for_typing(code, success))
     else:
-        check_rewards(code)
+        check_rewards(code, success)
 
-def check_rewards(code):
+def check_rewards(code, success):
     global lgf_coins, lgf_exp, quests_completed
-    output_text = console_output.get("1.0", tk.END)
-    recent_output = output_text.split("[SYSTEM] INITIATING COMPILER CYCLE...")[-1]
     
-    if "FATAL ERROR" in recent_output:
+    if not success:
         print("\n[SYSTEM] Compilation failed. 0 EXP / 0 Coins awarded.\n")
         play_sound('wrong') 
         btn_execute.config(state=tk.NORMAL)
         return
+        
+    # Show AST Button on success!
+    btn_view_ast.pack(side=tk.LEFT, padx=10)
 
     quest_passed = False
     target = active_quest["target"]
     
-    # Simple Target Validations
     if target in ["OUNT", "YEARN", "TAMARAW", "HERO"]:
         if any(data["type"] == target for data in symbol_table.values()): quest_passed = True
     elif target == "OUNT_ZERO":
         if any(data["type"] == "OUNT" and int(data["value"]) == 0 for data in symbol_table.values()): quest_passed = True
-    elif target == "OUNT_100":
-        if any(data["type"] == "OUNT" and int(data["value"]) == 100 for data in symbol_table.values()): quest_passed = True
-    elif target == "TAMARAW_TRUE":
-        if any(data["type"] == "TAMARAW" and str(data["value"]) == "True" for data in symbol_table.values()): quest_passed = True
-    elif target == "TAMARAW_FALSE":
-        if any(data["type"] == "TAMARAW" and str(data["value"]) == "False" for data in symbol_table.values()): quest_passed = True
-    elif target == "YEARN_HELLO":
-        if any(data["type"] == "YEARN" and str(data["value"]).strip('"') == "Hello" for data in symbol_table.values()): quest_passed = True
     elif target == "RELEASE":
         if "RELEASE" in code: quest_passed = True
-    
-    # Medium Double Targets
     elif target == "TWO_OUNT":
         if sum(1 for data in symbol_table.values() if data["type"] == "OUNT") >= 2: quest_passed = True
-    elif target == "TWO_YEARN":
-        if sum(1 for data in symbol_table.values() if data["type"] == "YEARN") >= 2: quest_passed = True
-    elif target == "TWO_HERO":
-        if sum(1 for data in symbol_table.values() if data["type"] == "HERO") >= 2: quest_passed = True
-    elif target == "TWO_TAMARAW":
-        if sum(1 for data in symbol_table.values() if data["type"] == "TAMARAW") >= 2: quest_passed = True
-    
-    # Hard Combo Targets
     elif target == "COMBO_OUNT_RELEASE":
         if any(data["type"] == "OUNT" for data in symbol_table.values()) and "RELEASE" in code: quest_passed = True
-    elif target == "COMBO_YEARN_RELEASE":
-        if any(data["type"] == "YEARN" for data in symbol_table.values()) and "RELEASE" in code: quest_passed = True
-    elif target == "COMBO_HERO_RELEASE":
-        if any(data["type"] == "HERO" for data in symbol_table.values()) and "RELEASE" in code: quest_passed = True
     elif target == "COMBO_TAMARAW_OUNT":
         if any(data["type"] == "TAMARAW" for data in symbol_table.values()) and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
-    elif target == "COMBO_TAMARAW_YEARN":
-        if any(data["type"] == "TAMARAW" for data in symbol_table.values()) and any(data["type"] == "YEARN" for data in symbol_table.values()): quest_passed = True
-    
-    # Math Validations
     elif target == "MATH_ADD":
         if "+" in code and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
     elif target == "MATH_SUB":
         if "-" in code and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
-    elif target == "MATH_MUL":
-        if "*" in code and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
-    elif target == "MATH_DIV":
-        if "/" in code and any(data["type"] == "OUNT" for data in symbol_table.values()): quest_passed = True
-    
-    # Extreme Combos
     elif target == "MATH_COMBO_ADD":
         if "+" in code and "RELEASE" in code: quest_passed = True
-    elif target == "MATH_COMBO_SUB":
-        if "-" in code and "RELEASE" in code: quest_passed = True
     elif target == "MATH_COMBO_MUL":
         if "*" in code and "RELEASE" in code: quest_passed = True
-    elif target == "MATH_COMBO_DIV":
-        if "/" in code and "RELEASE" in code: quest_passed = True
     elif target == "TRI_COMBO":
         if any(d["type"] == "OUNT" for d in symbol_table.values()) and any(d["type"] == "YEARN" for d in symbol_table.values()) and any(d["type"] == "TAMARAW" for d in symbol_table.values()): quest_passed = True
-    elif target == "QUAD_COMBO":
-        if any(d["type"] == "OUNT" for d in symbol_table.values()) and any(d["type"] == "YEARN" for d in symbol_table.values()) and any(d["type"] == "TAMARAW" for d in symbol_table.values()) and any(d["type"] == "HERO" for d in symbol_table.values()): quest_passed = True
     elif target == "EXTREME_RELEASE":
         types = set(d["type"] for d in symbol_table.values())
         if len(types) >= 3 and "RELEASE" in code: quest_passed = True
 
     if quest_passed:
         reward = active_quest["reward"]
-        
-        # Rank logic evaluation
         old_rank, _ = get_rank_info(lgf_exp)
         lgf_exp += reward
         lgf_coins += reward
@@ -491,12 +473,11 @@ def check_rewards(code):
         new_rank, _ = get_rank_info(lgf_exp)
         
         print(f"\n[QUEST COMPLETE] Target acquired! +{reward} EXP / +{reward} Coins.\n")
-        
         if new_rank != old_rank:
             print("*"*50)
             print(f"[PROMOTION] YOU HAVE RANKED UP TO: {new_rank.upper()}!!!")
             print("*"*50 + "\n")
-            play_sound('gacha') # Epic sound for rank up
+            play_sound('gacha') 
         else:
             play_sound('right') 
             
@@ -516,6 +497,7 @@ def next_quest():
     console_output.delete("1.0", tk.END) 
     highlight_syntax()
     btn_next.pack_forget()
+    btn_view_ast.pack_forget()
     btn_execute.config(state=tk.NORMAL)
 
 # --- THE GACHA ANIMATION SYSTEM ---
@@ -525,12 +507,7 @@ def pull_gacha():
     
     loot_pool = list(themes.keys())
     loot_pool.remove("Default Theme")
-    
-    rates = {
-        "THE GOLDEN COMPILER": 1.0, "FEU TAMARAWS": 1.0, "FEU TECH ACM": 1.0,
-        "GILBERTO GREEN": 3.0, "RADIANT PROTOCOL": 3.0
-    }
-    drop_rates = [rates.get(theme, 9.1) for theme in loot_pool]
+    drop_rates = [1.0 if t in ["THE GOLDEN COMPILER", "FEU TAMARAWS", "FEU TECH ACM"] else 3.0 if t in ["GILBERTO GREEN", "RADIANT PROTOCOL"] else 9.1 for t in loot_pool]
     
     if lgf_coins >= 100:
         lgf_coins -= 100
@@ -540,17 +517,12 @@ def pull_gacha():
         btn_pull.config(state=tk.DISABLED)
         
         active_spin_channel = play_sound('spin', loop=-1)
-        
         won_item = random.choices(loot_pool, weights=drop_rates, k=1)[0]
-        flashes = 20
-        base_delay = 40
         
         def animate_roll(current_flash):
-            if current_flash < flashes:
-                fake_item = random.choice(loot_pool)
-                gacha_result.config(text=f"Rolling... [{fake_item}]", fg=themes["Default Theme"]["text"])
-                next_delay = base_delay + int((current_flash ** 1.5) * 2) 
-                root.after(next_delay, animate_roll, current_flash + 1)
+            if current_flash < 20:
+                gacha_result.config(text=f"Rolling... [{random.choice(loot_pool)}]", fg=themes["Default Theme"]["text"])
+                root.after(40 + int((current_flash ** 1.5) * 2), animate_roll, current_flash + 1)
             else:
                 finalize_pull(won_item)
         animate_roll(0) 
@@ -560,9 +532,7 @@ def pull_gacha():
 
 def finalize_pull(won_item):
     global is_pulling, lgf_coins, active_spin_channel
-    
-    if active_spin_channel:
-        active_spin_channel.stop()
+    if active_spin_channel: active_spin_channel.stop()
     play_sound('gacha')
     
     if won_item not in inventory: 
@@ -587,8 +557,7 @@ def equip_item():
     global equipped_theme
     selection = inventory_listbox.curselection()
     if selection:
-        item = inventory_listbox.get(selection[0])
-        equipped_theme = item
+        equipped_theme = inventory_listbox.get(selection[0])
         lbl_equipped.config(text=f"Equipped: [{equipped_theme}]")
         gacha_result.config(text=f"[SYSTEM] Equipped {equipped_theme} successfully.", fg=themes[equipped_theme]["accent"])
         apply_theme(equipped_theme)
@@ -636,7 +605,6 @@ def unlock_all_skins(event=None):
 # --- THE UI ENGINE (3D BLOCKY EDITION) ---
 def apply_theme(theme_name):
     t = themes[theme_name]
-    
     def bind_button_events(btn, default_bg, hover_bg):
         btn.bind("<Enter>", lambda e, b=btn, c=hover_bg: b.configure(bg=c))
         btn.bind("<Leave>", lambda e, b=btn, c=default_bg: b.configure(bg=c))
@@ -650,42 +618,19 @@ def apply_theme(theme_name):
         frame.configure(bg=t["panel"], highlightbackground=t["accent"], highlightcolor=t["accent"])
         
     lbl_menu_title.configure(bg=t["bg"], fg=t["text"])
-    
-    if lbl_menu_dev.cget("text") not in ["[ GOD MODE ACTIVATED ]", "[ DEV FUNDS INJECTED ]", "[ ALL SKINS UNLOCKED ]"]:
-        lbl_menu_dev.configure(bg=t["bg"], fg=t["accent"])
-    else:
-        lbl_menu_dev.configure(bg=t["bg"]) 
-        
-    # Stats colors
+    lbl_menu_dev.configure(bg=t["bg"], fg=t["accent"] if lbl_menu_dev.cget("text") not in ["[ GOD MODE ACTIVATED ]", "[ DEV FUNDS INJECTED ]", "[ ALL SKINS UNLOCKED ]"] else t["bg"])
     lbl_menu_rank.configure(bg=t["bg"], fg=t["accent"])
     lbl_menu_exp.configure(bg=t["bg"], fg=t["success"])
     lbl_menu_coins.configure(bg=t["bg"], fg=t["success"])
     
-    # --- 3D BUTTONS & HOVERS ---
-    btn_menu_arena.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
-    bind_button_events(btn_menu_arena, t["accent"], t["hover"])
-    btn_menu_market.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_button_events(btn_menu_market, t["panel"], t["accent"])
-    btn_menu_codex.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_button_events(btn_menu_codex, t["panel"], t["accent"])
-    
-    btn_back_arena.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_button_events(btn_back_arena, t["panel"], t["accent"])
-    btn_execute.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
-    bind_button_events(btn_execute, t["accent"], t["hover"])
-    btn_next.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_button_events(btn_next, t["panel"], t["accent"])
-    
-    btn_back_market.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_button_events(btn_back_market, t["panel"], t["accent"])
-    btn_pull.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
-    bind_button_events(btn_pull, t["accent"], t["hover"])
-    btn_equip.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
-    bind_button_events(btn_equip, t["accent"], t["hover"])
-    btn_back_codex.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
-    bind_button_events(btn_back_codex, t["panel"], t["accent"])
+    for btn in [btn_menu_arena, btn_execute, btn_pull, btn_equip, btn_view_ast]:
+        btn.configure(bg=t["accent"], fg=t["btn_fg"], activebackground=t["hover"])
+        bind_button_events(btn, t["accent"], t["hover"])
+        
+    for btn in [btn_menu_market, btn_menu_codex, btn_back_arena, btn_next, btn_back_market, btn_back_codex]:
+        btn.configure(bg=t["panel"], fg=t["text"], activebackground=t["accent"])
+        bind_button_events(btn, t["panel"], t["accent"])
 
-    # UI colors
     lbl_quest.configure(bg=t["panel"], fg=t["success"])
     code_input.configure(bg=t["panel"], fg=t["text"], insertbackground=t["text"])
     console_container.configure(bg=t["bg"])
@@ -694,10 +639,7 @@ def apply_theme(theme_name):
     
     lbl_market_title.configure(bg=t["bg"], fg=t["text"])
     lbl_gacha_coins.configure(bg=t["bg"], fg=t["success"])
-    if "SUCCESS" not in gacha_result.cget("text") and "LEGENDARY" not in gacha_result.cget("text") and "EPIC" not in gacha_result.cget("text"):
-        gacha_result.configure(bg=t["bg"], fg=t["text"])
-    else:
-        gacha_result.configure(bg=t["bg"])
+    gacha_result.configure(bg=t["bg"], fg=t["text"] if "SUCCESS" not in gacha_result.cget("text") and "LEGENDARY" not in gacha_result.cget("text") and "EPIC" not in gacha_result.cget("text") else t["bg"])
         
     lbl_vault_title.configure(bg=t["panel"], fg=t["text"])
     lbl_equipped.configure(bg=t["panel"], fg=t["success"])
@@ -714,22 +656,13 @@ def apply_theme(theme_name):
     highlight_syntax()
 
 def show_frame(frame_to_show):
-    menu_frame.pack_forget()
-    coding_frame.pack_forget()
-    gacha_frame.pack_forget()
-    cheat_frame.pack_forget()
+    for f in [menu_frame, coding_frame, gacha_frame, cheat_frame]: f.pack_forget()
     frame_to_show.pack(fill=tk.BOTH, expand=True)
 
 def update_stats_labels():
     current_rank, next_threshold = get_rank_info(lgf_exp)
-    
     lbl_menu_rank.config(text=f"[{current_rank}]")
-    
-    if next_threshold == "MAX":
-        lbl_menu_exp.config(text=f"[EXP]: {lgf_exp} (MAX RANK)")
-    else:
-        lbl_menu_exp.config(text=f"[EXP]: {lgf_exp} / {next_threshold}")
-        
+    lbl_menu_exp.config(text=f"[EXP]: {lgf_exp} (MAX RANK)" if next_threshold == "MAX" else f"[EXP]: {lgf_exp} / {next_threshold}")
     lbl_menu_coins.config(text=f"[VAULT]: {lgf_coins} Coins")
     lbl_gacha_coins.config(text=f"[VAULT]: {lgf_coins} Coins")
 
@@ -753,26 +686,13 @@ lbl_boot.pack(anchor="nw", padx=20, pady=20)
 
 def run_boot_sequence():
     boot_frame.pack(fill=tk.BOTH, expand=True)
-    messages = [
-        "LGF_OS v3.1.4 [INITIALIZING...]",
-        "LOADING AUDIO MIXER... [OK]",
-        "LOADING LEXICAL STATE MACHINE... [OK]",
-        "MOUNTING VAULT DATA... [OK]",
-        "ESTABLISHING NEURAL LINK... [OK]",
-        "SYSTEM READY."
-    ]
+    messages = ["LGF_OS v3.1.4 [INITIALIZING...]", "LOADING AUDIO MIXER... [OK]", "LOADING LEXICAL STATE MACHINE... [OK]", "MOUNTING VAULT DATA... [OK]", "ESTABLISHING NEURAL LINK... [OK]", "SYSTEM READY."]
     def show_message(index):
         if index < len(messages):
-            current_text = lbl_boot.cget("text")
-            lbl_boot.config(text=current_text + "\n> " + messages[index])
+            lbl_boot.config(text=lbl_boot.cget("text") + "\n> " + messages[index])
             root.after(300, show_message, index + 1)
         else:
-            root.after(800, finish_boot)
-            
-    def finish_boot():
-        boot_frame.pack_forget()
-        show_frame(menu_frame)
-
+            root.after(800, lambda: [boot_frame.pack_forget(), show_frame(menu_frame)])
     root.after(500, show_message, 0)
 
 # ==========================================
@@ -784,22 +704,17 @@ lbl_menu_title.pack(pady=(80, 10))
 lbl_menu_dev = tk.Label(menu_frame, text="Developer Edition", font=(RETRO_FONT, 17, "italic"))
 lbl_menu_dev.pack(pady=(0, 20))
 
-# --- RANK & EXP DISPLAY ---
 lbl_menu_rank = tk.Label(menu_frame, text="[Rank Loading...]", font=(RETRO_FONT, 24, "bold"))
 lbl_menu_rank.pack(pady=(0, 5))
-
 lbl_menu_exp = tk.Label(menu_frame, text="[EXP Loading...]", font=(RETRO_FONT, 16))
 lbl_menu_exp.pack(pady=(0, 20))
-
 lbl_menu_coins = tk.Label(menu_frame, text=f"[VAULT]: {lgf_coins} Coins", font=(RETRO_FONT, 20, "bold"))
 lbl_menu_coins.pack(pady=(0, 20))
 
 btn_menu_arena = tk.Button(menu_frame, text="ENTER ARENA", font=(RETRO_FONT, 17, "bold"), width=22, pady=3, bd=5, relief=tk.RAISED, command=lambda: show_frame(coding_frame))
 btn_menu_arena.pack(pady=10)
-
 btn_menu_market = tk.Button(menu_frame, text="THE MARKETPLACE", font=(RETRO_FONT, 17, "bold"), width=22, pady=3, bd=5, relief=tk.RAISED, command=lambda: show_frame(gacha_frame))
 btn_menu_market.pack(pady=10)
-
 btn_menu_codex = tk.Button(menu_frame, text="ACCESS CODEX", font=(RETRO_FONT, 17, "bold"), width=22, pady=3, bd=5, relief=tk.RAISED, command=lambda: show_frame(cheat_frame))
 btn_menu_codex.pack(pady=10)
 
@@ -811,7 +726,6 @@ btn_back_arena.pack(anchor="nw", padx=10, pady=10)
 
 mission_frame = tk.Frame(coding_frame, bd=5, relief=tk.RAISED)
 mission_frame.pack(fill=tk.X, padx=20, pady=(10, 20))
-
 lbl_quest = tk.Label(mission_frame, text=active_quest["task"], font=(RETRO_FONT, 24, "bold"), pady=20)
 lbl_quest.pack()
 
@@ -825,6 +739,10 @@ btn_action_frame.pack(pady=15)
 btn_execute = tk.Button(btn_action_frame, text="COMPILE & EXECUTE", font=(RETRO_FONT, 14, "bold"), pady=3, bd=5, relief=tk.RAISED, command=execute_code)
 btn_execute.pack(side=tk.LEFT, padx=10)
 
+# NEW BUTTON FOR AST VISUALIZER
+btn_view_ast = tk.Button(btn_action_frame, text="VIEW AST", font=(RETRO_FONT, 14, "bold"), pady=3, bd=5, relief=tk.RAISED, command=show_ast_visualizer)
+# It starts hidden, only shown upon successful compilation
+
 btn_next = tk.Button(btn_action_frame, text="NEXT MISSION", font=(RETRO_FONT, 14, "bold"), pady=3, bd=5, relief=tk.RAISED, command=next_quest)
 
 console_container = tk.Frame(coding_frame, bd=5, relief=tk.SUNKEN)
@@ -832,10 +750,8 @@ console_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
 console_header = tk.Label(console_container, text="[ SYSTEM TERMINAL ]", font=(RETRO_FONT, 16, "bold"), anchor="w", padx=10, pady=4)
 console_header.pack(fill=tk.X)
-
 console_output = scrolledtext.ScrolledText(console_container, height=8, font=(RETRO_FONT, 18), bd=0, highlightthickness=0, padx=10, pady=10)
 console_output.pack(fill=tk.BOTH, expand=True)
-
 sys.stdout = RedirectText(console_output)
 
 # ==========================================
@@ -843,37 +759,27 @@ sys.stdout = RedirectText(console_output)
 # ==========================================
 pull_left = tk.Frame(gacha_frame)
 pull_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
 inv_right = tk.Frame(gacha_frame, width=450, bd=5, relief=tk.RAISED)
 inv_right.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
 
 btn_back_market = tk.Button(pull_left, text="RETURN TO MENU", font=(RETRO_FONT, 12, "bold"), bd=5, relief=tk.RAISED, command=lambda: show_frame(menu_frame))
 btn_back_market.pack(anchor="nw", padx=10, pady=10)
-
 lbl_market_title = tk.Label(pull_left, text="THE MARKETPLACE", font=(RETRO_FONT, 42, "bold"))
 lbl_market_title.pack(pady=30)
-
 lbl_gacha_coins = tk.Label(pull_left, text=f"[VAULT]: {lgf_coins} Coins", font=(RETRO_FONT, 22, "bold"))
 lbl_gacha_coins.pack(pady=10)
-
 btn_pull = tk.Button(pull_left, text="PULL SKIN (100 COINS)", font=(RETRO_FONT, 18, "bold"), pady=5, bd=5, relief=tk.RAISED, command=pull_gacha)
 btn_pull.pack(pady=30)
-
 gacha_result = tk.Label(pull_left, text="Awaiting transaction...", font=(RETRO_FONT, 18))
 gacha_result.pack(pady=20)
 
 lbl_vault_title = tk.Label(inv_right, text="YOUR VAULT", font=(RETRO_FONT, 24, "bold"))
 lbl_vault_title.pack(pady=(20, 10))
-
 lbl_equipped = tk.Label(inv_right, text=f"Equipped: [{equipped_theme}]", font=(RETRO_FONT, 14, "italic"), wraplength=300)
 lbl_equipped.pack(pady=(0, 20))
-
 inventory_listbox = tk.Listbox(inv_right, font=(RETRO_FONT, 20), bd=4, relief=tk.SUNKEN)
 inventory_listbox.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-
-for item in inventory:
-    inventory_listbox.insert(tk.END, item)
-
+for item in inventory: inventory_listbox.insert(tk.END, item)
 btn_equip = tk.Button(inv_right, text="EQUIP SELECTED", font=(RETRO_FONT, 16, "bold"), pady=5, bd=5, relief=tk.RAISED, command=equip_item)
 btn_equip.pack(fill=tk.X, padx=20, pady=(0, 20))
 
@@ -919,12 +825,10 @@ syntax_text = """VARIABLE DECLARATION:\n[Type] [Name] IS [Literal] :>\n\nEx: OUN
 lbl_syntax_text = tk.Label(syntax_card, text=syntax_text, font=(RETRO_FONT, 20), justify="left")
 lbl_syntax_text.pack(anchor="w", padx=30, pady=10)
 
-# --- STARTUP ---
-update_stats_labels() # Initializes the rank on screen
+update_stats_labels() 
 apply_theme(equipped_theme) 
 run_boot_sequence() 
 
-# SECRET HOTKEYS
 root.bind('<F9>', enable_dev_mode)
 root.bind('<F10>', disable_dev_mode)
 root.bind('<F11>', unlock_all_skins)
