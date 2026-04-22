@@ -12,13 +12,21 @@ import pygame
 pygame.mixer.init()
 sounds = {}
 
+# NEW: This function helps the .exe find your mp3 files when bundled!
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 def load_sounds():
     try:
-        sounds['click'] = pygame.mixer.Sound("click.mp3")
-        sounds['right'] = pygame.mixer.Sound("rightAnswer.mp3")
-        sounds['wrong'] = pygame.mixer.Sound("wrongAnswer.mp3")
-        sounds['spin'] = pygame.mixer.Sound("spin.mp3")
-        sounds['gacha'] = pygame.mixer.Sound("gachagot.mp3")
+        sounds['click'] = pygame.mixer.Sound(resource_path("click.mp3"))
+        sounds['right'] = pygame.mixer.Sound(resource_path("rightAnswer.mp3"))
+        sounds['wrong'] = pygame.mixer.Sound(resource_path("wrongAnswer.mp3"))
+        sounds['spin'] = pygame.mixer.Sound(resource_path("spin.mp3"))
+        sounds['gacha'] = pygame.mixer.Sound(resource_path("gachagot.mp3"))
     except Exception as e:
         print(f"[SYSTEM] Audio files missing or failed to load: {e}")
 
